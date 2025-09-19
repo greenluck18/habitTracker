@@ -24,14 +24,24 @@ struct HabitListView: View {
                     
                     let todayProgress = viewModel.getTodayProgress()
                     if todayProgress.total > 0 {
-                        VStack(spacing: 4) {
-                            Text("\(todayProgress.completed)/\(todayProgress.total) habits completed today")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("\(todayProgress.completed)/\(todayProgress.total) habits completed today")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Text("\(Int((Double(todayProgress.completed) / Double(todayProgress.total)) * 100))%")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.green)
+                            }
                             
                             ProgressView(value: Double(todayProgress.completed), total: Double(todayProgress.total))
                                 .progressViewStyle(LinearProgressViewStyle(tint: .green))
-                                .frame(height: 6)
+                                .frame(height: 8)
+                                .scaleEffect(x: 1, y: 1.5, anchor: .center) // Make it slightly thicker
                         }
                     } else {
                         Text("Add your first habit to start tracking!")
