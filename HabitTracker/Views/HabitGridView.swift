@@ -34,6 +34,13 @@ struct HabitGridView: View {
         let date = calendar.date(from: DateComponents(year: selectedYear, month: selectedMonth)) ?? Date()
         return monthFormatter.string(from: date)
     }
+    
+    private func monthName(for month: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        let date = calendar.date(from: DateComponents(year: selectedYear, month: month)) ?? Date()
+        return formatter.string(from: date)
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -173,19 +180,29 @@ struct HabitGridView: View {
                     )
                     .padding()
                 } else {
-                    // Year view - monthly blocks grid (3x4 layout)
-                    LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 2), count: 3), spacing: 4) {
-                        ForEach(1...12, id: \.self) { month in
-                            MonthBlockView(
-                                year: selectedYear,
-                                month: month,
-                                viewModel: viewModel,
-                                onDateTap: { date in
-                                    selectedDate = date
-                                    showingDateDetail = true
-                                }
-                            )
+                    // Year view - unified contribution grid
+                    VStack(spacing: 8) {
+                        // Month labels
+                        HStack(spacing: 0) {
+                            ForEach(1...12, id: \.self) { month in
+                                Text(monthName(for: month))
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity)
+                            }
                         }
+                        .padding(.horizontal)
+                        
+                        // Unified contribution grid
+                        YearContributionGrid(
+                            year: selectedYear,
+                            viewModel: viewModel,
+                            onDateTap: { date in
+                                selectedDate = date
+                                showingDateDetail = true
+                            }
+                        )
                     }
                     .padding()
                 }
@@ -356,211 +373,6 @@ struct ContributionCell: View {
             return Color(red: 0.1, green: 0.7, blue: 0.1) // Dark green
         default:
             return Color(red: 0.0, green: 0.6, blue: 0.0) // Super dark green
-        }
-    }
-}
-
-struct MonthBlockView: View {
-    let year: Int
-    let month: Int
-    @ObservedObject var viewModel: HabitViewModel
-    let onDateTap: (Date) -> Void
-    
-    private let calendar = Calendar.current
-    private let dateFormatter = DateFormatter()
-    
-    init(year: Int, month: Int, viewModel: HabitViewModel, onDateTap: @escaping (Date) -> Void) {
-        self.year = year
-        self.month = month
-        self.viewModel = viewModel
-        self.onDateTap = onDateTap
-        dateFormatter.dateFormat = "MMM"
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Month header
-            HStack {
-                Text(dateFormatter.string(from: monthDate))
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                
-                Spacer()
-                
-                // Month completion stats
-                let monthStats = getMonthStats()
-                if monthStats.totalDays > 0 {
-                    Text("\(monthStats.completedDays)/\(monthStats.totalDays)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.top, 6)
-            
-            // Calendar grid inside the month block
-            VStack(spacing: 1) {
-                // Day labels row
-                HStack(spacing: 1) {
-                    ForEach(0..<7, id: \.self) { dayIndex in
-                        Text(dayLabel(for: dayIndex))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .frame(width: 12, height: 8)
-                    }
-                }
-                
-                // Calendar grid
-                LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 0.5), count: 7), spacing: 0.5) {
-                    ForEach(generateMonthDates(), id: \.self) { date in
-                        MonthContributionCell(
-                            date: date,
-                            completionCount: viewModel.habitHistory[dateKey(date)]?.count ?? 0,
-                            totalHabits: viewModel.habits.count,
-                            isToday: calendar.isDateInToday(date),
-                            isCurrentMonth: calendar.component(.month, from: date) == month,
-                            onTap: {
-                                onDateTap(date)
-                            }
-                        )
-                    }
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 6)
-        }
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color(.systemGray4), lineWidth: 0.5)
-        )
-    }
-    
-    private var monthDate: Date {
-        calendar.date(from: DateComponents(year: year, month: month, day: 1)) ?? Date()
-    }
-    
-    private func generateMonthDates() -> [Date] {
-        guard let startOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
-              let endOfMonth = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
-            return []
-        }
-        
-        // Find the Sunday of the week containing startOfMonth
-        let weekday = calendar.component(.weekday, from: startOfMonth)
-        let daysToSubtract = (weekday - 1) % 7
-        let gridStartDate = calendar.date(byAdding: .day, value: -daysToSubtract, to: startOfMonth) ?? startOfMonth
-        
-        var dates: [Date] = []
-        var currentDate = gridStartDate
-        
-        // Generate 6 weeks worth of dates (42 days) to fill the calendar grid
-        for _ in 0..<42 {
-            dates.append(currentDate)
-            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
-        }
-        
-        return dates
-    }
-    
-    private func dayLabel(for dayIndex: Int) -> String {
-        let days = ["S", "M", "T", "W", "T", "F", "S"]
-        return days[dayIndex]
-    }
-    
-    private func getMonthStats() -> (completedDays: Int, totalDays: Int) {
-        guard let startOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
-              let endOfMonth = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
-            return (0, 0)
-        }
-        
-        var completedDays = 0
-        var currentDate = startOfMonth
-        
-        while currentDate <= endOfMonth {
-            let key = dateKey(currentDate)
-            if let completedHabits = viewModel.habitHistory[key], !completedHabits.isEmpty {
-                completedDays += 1
-            }
-            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
-        }
-        
-        let totalDays = calendar.range(of: .day, in: .month, for: startOfMonth)?.count ?? 0
-        return (completedDays: completedDays, totalDays: totalDays)
-    }
-    
-    private func dateKey(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
-}
-
-struct MonthContributionCell: View {
-    let date: Date
-    let completionCount: Int
-    let totalHabits: Int
-    let isToday: Bool
-    let isCurrentMonth: Bool
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(cellColor)
-                .frame(width: 10, height: 10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .stroke(isToday ? Color.blue : Color.clear, lineWidth: 1)
-                )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .opacity(isCurrentMonth ? 1.0 : 0.3)
-    }
-    
-    private var cellColor: Color {
-        if !isCurrentMonth {
-            return Color.gray.opacity(0.1)
-        }
-        
-        if totalHabits == 0 {
-            return Color.gray.opacity(0.1)
-        }
-        
-        // Calculate completion level based on percentage
-        let completionPercentage = Double(completionCount) / Double(totalHabits)
-        let level: Int
-        
-        if completionPercentage == 0 {
-            level = 0
-        } else if completionPercentage <= 0.2 {
-            level = 1
-        } else if completionPercentage <= 0.4 {
-            level = 2
-        } else if completionPercentage <= 0.6 {
-            level = 3
-        } else if completionPercentage <= 0.8 {
-            level = 4
-        } else {
-            level = 5
-        }
-        
-        // GitHub-style color progression
-        switch level {
-        case 0:
-            return Color.gray.opacity(0.1)
-        case 1:
-            return Color(red: 0.9, green: 0.95, blue: 0.9)
-        case 2:
-            return Color(red: 0.6, green: 0.9, blue: 0.6)
-        case 3:
-            return Color(red: 0.3, green: 0.8, blue: 0.3)
-        case 4:
-            return Color(red: 0.1, green: 0.7, blue: 0.1)
-        default:
-            return Color(red: 0.0, green: 0.6, blue: 0.0)
         }
     }
 }

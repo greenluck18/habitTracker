@@ -53,9 +53,13 @@ Each deleted habit has realistic completion patterns:
   - Use left/right arrows to navigate months
 - **Year View**: 
   - Toggle to "Year" mode using the segmented control
-  - See monthly blocks in 3x4 grid layout (now more compact)
-  - Each month shows GitHub-style contribution grid
-  - Smaller cells prevent overlapping
+  - See 12 month blocks arranged in a 3x4 grid
+  - Each month block shows:
+    - Month name (Jan, Feb, Mar, etc.)
+    - Completion count (e.g., "7/30" for September)
+    - Weekday headers (S M T W T F S)
+    - GitHub-style contribution squares for each day
+  - Tap any day square to see detailed progress
   - Use year selector and navigation arrows
 
 ### 4. **Day Details with Archived Habits**
