@@ -41,17 +41,19 @@ Each deleted habit has realistic completion patterns:
 
 ### 3. **Progress View - Month vs Year**
 - Tap "View Progress" to open the progress view
-- **Default View**: Should show current month with daily calendar grid
+- **Default View**: Should show current month with GitHub-style contribution grid
 - **Month View**: 
-  - See daily calendar with weekday headers (S M T W T F S)
-  - Each day shows completion status with colored dots
+  - See GitHub-style contribution grid (small colored squares)
+  - Month name and completion stats at the top (e.g., "Sep 7/30")
+  - Each square represents a day with color-coded completion levels
   - Today is highlighted with blue border
-  - Tap any day to see detailed progress
+  - Tap any square to see detailed progress
   - Use left/right arrows to navigate months
 - **Year View**: 
   - Toggle to "Year" mode using the segmented control
-  - See monthly blocks in 3x4 grid layout
-  - Each month shows overall completion pattern
+  - See monthly blocks in 3x4 grid layout (now more compact)
+  - Each month shows GitHub-style contribution grid
+  - Smaller cells prevent overlapping
   - Use year selector and navigation arrows
 
 ### 4. **Day Details with Archived Habits**

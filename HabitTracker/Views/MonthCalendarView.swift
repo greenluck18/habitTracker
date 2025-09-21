@@ -32,30 +32,56 @@ struct MonthCalendarView: View {
         ]
     }
     
+    private var monthName: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        let date = calendar.date(from: DateComponents(year: year, month: month)) ?? Date()
+        return formatter.string(from: date)
+    }
+    
+    private var totalDays: Int {
+        guard let range = calendar.range(of: .day, in: .month, for: calendar.date(from: DateComponents(year: year, month: month, day: 1)) ?? Date()) else {
+            return 0
+        }
+        return range.count
+    }
+    
+    private var completedDays: Int {
+        let allDays = calendarDays
+        return allDays.filter { getCompletionCount(for: $0) > 0 }.count
+    }
+    
+    private var contributionDays: [(date: Date, completionCount: Int)] {
+        let allDays = calendarDays
+        return allDays.map { date in
+            (date: date, completionCount: getCompletionCount(for: date))
+        }
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Weekday headers
-            HStack(spacing: 0) {
-                ForEach(weekdayHeaders, id: \.id) { weekday in
-                    Text(weekday.name)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                }
+        VStack(spacing: 8) {
+            // Month title and stats
+            HStack {
+                Text(monthName)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                Text("\(completedDays)/\(totalDays)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .padding(.bottom, 8)
             
-            // Calendar grid
-            LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 0), count: 7), spacing: 4) {
-                ForEach(calendarDays, id: \.self) { date in
-                    DayCellView(
-                        date: date,
-                        isCurrentMonth: calendar.component(.month, from: date) == month,
-                        isToday: calendar.isDateInToday(date),
-                        completionCount: getCompletionCount(for: date),
+            // GitHub-style contribution grid
+            LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 2), count: 7), spacing: 2) {
+                ForEach(contributionDays, id: \.date) { contributionDay in
+                    ContributionCell(
+                        date: contributionDay.date,
+                        completionCount: contributionDay.completionCount,
                         totalHabits: viewModel.habits.count,
-                        onTap: { onDateTap(date) }
+                        isToday: calendar.isDateInToday(contributionDay.date),
+                        onTap: { onDateTap(contributionDay.date) }
                     )
                 }
             }
@@ -189,3 +215,4 @@ struct DayCellView: View {
         }
     }
 }
+

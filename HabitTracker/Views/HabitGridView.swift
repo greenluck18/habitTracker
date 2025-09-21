@@ -174,7 +174,7 @@ struct HabitGridView: View {
                     .padding()
                 } else {
                     // Year view - monthly blocks grid (3x4 layout)
-                    LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 8), count: 3), spacing: 12) {
+                    LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 4), count: 3), spacing: 8) {
                         ForEach(1...12, id: \.self) { month in
                             MonthBlockView(
                                 year: selectedYear,
@@ -378,11 +378,11 @@ struct MonthBlockView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             // Month header
             HStack {
                 Text(dateFormatter.string(from: monthDate))
-                    .font(.headline)
+                    .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
                 
@@ -392,27 +392,27 @@ struct MonthBlockView: View {
                 let monthStats = getMonthStats()
                 if monthStats.totalDays > 0 {
                     Text("\(monthStats.completedDays)/\(monthStats.totalDays)")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
+            .padding(.horizontal, 6)
+            .padding(.top, 6)
             
             // Calendar grid inside the month block
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 // Day labels row
-                HStack(spacing: 2) {
+                HStack(spacing: 1) {
                     ForEach(0..<7, id: \.self) { dayIndex in
                         Text(dayLabel(for: dayIndex))
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                            .frame(width: 16, height: 12)
+                            .frame(width: 12, height: 8)
                     }
                 }
                 
                 // Calendar grid
-                LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 1), count: 7), spacing: 1) {
+                LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 0.5), count: 7), spacing: 0.5) {
                     ForEach(generateMonthDates(), id: \.self) { date in
                         MonthContributionCell(
                             date: date,
@@ -427,14 +427,14 @@ struct MonthBlockView: View {
                     }
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 6)
+            .padding(.bottom, 6)
         }
         .background(Color(.systemGray6))
-        .cornerRadius(12)
+        .cornerRadius(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(.systemGray4), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(.systemGray4), lineWidth: 0.5)
         )
     }
     
@@ -508,12 +508,12 @@ struct MonthContributionCell: View {
     
     var body: some View {
         Button(action: onTap) {
-            RoundedRectangle(cornerRadius: 2)
+            RoundedRectangle(cornerRadius: 1.5)
                 .fill(cellColor)
-                .frame(width: 14, height: 14)
+                .frame(width: 10, height: 10)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 2)
-                        .stroke(isToday ? Color.blue : Color.clear, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .stroke(isToday ? Color.blue : Color.clear, lineWidth: 1)
                 )
         }
         .buttonStyle(PlainButtonStyle())
