@@ -45,8 +45,10 @@ Each deleted habit has realistic completion patterns:
 - **Month View**: 
   - See GitHub-style contribution grid (small colored squares)
   - Month name and completion stats at the top (e.g., "Sep 7/30")
+  - Weekday headers (S M T W T F S) above the grid
+  - Day numbers displayed above each contribution square
   - Each square represents a day with color-coded completion levels
-  - Today is highlighted with blue border
+  - Today is highlighted with blue border and white day number
   - Tap any square to see detailed progress
   - Use left/right arrows to navigate months
 - **Year View**: 

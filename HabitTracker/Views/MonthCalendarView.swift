@@ -58,6 +58,24 @@ struct MonthCalendarView: View {
         }
     }
     
+    private func dayNumber(for date: Date) -> String {
+        let day = calendar.component(.day, from: date)
+        return "\(day)"
+    }
+    
+    private func dayNumberColor(for date: Date) -> Color {
+        let isCurrentMonth = calendar.component(.month, from: date) == month
+        let isToday = calendar.isDateInToday(date)
+        
+        if isToday {
+            return .white
+        } else if isCurrentMonth {
+            return .primary
+        } else {
+            return .secondary.opacity(0.5)
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 8) {
             // Month title and stats
@@ -73,16 +91,35 @@ struct MonthCalendarView: View {
                     .foregroundColor(.secondary)
             }
             
-            // GitHub-style contribution grid
-            LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 2), count: 7), spacing: 2) {
+            // Weekday headers
+            HStack(spacing: 0) {
+                ForEach(weekdayHeaders, id: \.id) { weekday in
+                    Text(weekday.name)
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            
+            // GitHub-style contribution grid with day numbers
+            LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 1), count: 7), spacing: 1) {
                 ForEach(contributionDays, id: \.date) { contributionDay in
-                    ContributionCell(
-                        date: contributionDay.date,
-                        completionCount: contributionDay.completionCount,
-                        totalHabits: viewModel.habits.count,
-                        isToday: calendar.isDateInToday(contributionDay.date),
-                        onTap: { onDateTap(contributionDay.date) }
-                    )
+                    VStack(spacing: 2) {
+                        // Day number
+                        Text(dayNumber(for: contributionDay.date))
+                            .font(.caption2)
+                            .foregroundColor(dayNumberColor(for: contributionDay.date))
+                        
+                        // Contribution cell
+                        ContributionCell(
+                            date: contributionDay.date,
+                            completionCount: contributionDay.completionCount,
+                            totalHabits: viewModel.habits.count,
+                            isToday: calendar.isDateInToday(contributionDay.date),
+                            onTap: { onDateTap(contributionDay.date) }
+                        )
+                    }
                 }
             }
         }

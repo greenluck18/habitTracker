@@ -174,7 +174,7 @@ struct HabitGridView: View {
                     .padding()
                 } else {
                     // Year view - monthly blocks grid (3x4 layout)
-                    LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 4), count: 3), spacing: 8) {
+                    LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 2), count: 3), spacing: 4) {
                         ForEach(1...12, id: \.self) { month in
                             MonthBlockView(
                                 year: selectedYear,
