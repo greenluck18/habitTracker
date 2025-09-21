@@ -12,13 +12,27 @@ struct HabitGridView: View {
     @State private var selectedDate: Date?
     @State private var showingDateDetail = false
     @State private var selectedYear = Calendar.current.component(.year, from: Date())
+    @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var showingYearSelector = false
+    @State private var viewMode: ViewMode = .month // Default to month view
+    
+    enum ViewMode {
+        case month
+        case year
+    }
     
     private let calendar = Calendar.current
     private let dateFormatter = DateFormatter()
     
     init() {
         dateFormatter.dateFormat = "MMM d, yyyy"
+    }
+    
+    private var monthYearString: String {
+        let monthFormatter = DateFormatter()
+        monthFormatter.dateFormat = "MMMM yyyy"
+        let date = calendar.date(from: DateComponents(year: selectedYear, month: selectedMonth)) ?? Date()
+        return monthFormatter.string(from: date)
     }
 
     var body: some View {
@@ -29,74 +43,152 @@ struct HabitGridView: View {
                     .font(.headline)
                     .foregroundColor(.primary)
                 
-                let todayCount = viewModel.habitHistory[dateKey(Date())]?.count ?? 0
+                let todayCompletedHabits = viewModel.habitHistory[dateKey(Date())] ?? []
                 let totalHabits = viewModel.habits.count
-                Text("\(todayCount)/\(totalHabits) habits completed today")
+                
+                // Filter out habits that no longer exist in the active habits list
+                let validTodayCompleted = todayCompletedHabits.filter { habitId in
+                    viewModel.habits.contains { $0.id == habitId }
+                }
+                
+                Text("\(validTodayCompleted.count)/\(totalHabits) habits completed today")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
                 if totalHabits > 0 {
-                    ProgressView(value: Double(todayCount), total: Double(totalHabits))
+                    ProgressView(value: Double(validTodayCompleted.count), total: Double(totalHabits))
                         .progressViewStyle(LinearProgressViewStyle(tint: .green))
                         .frame(height: 8)
                 }
             }
             .padding(.horizontal)
             
-            // Year selector
-            HStack {
-                Button(action: {
-                    showingYearSelector = true
-                }) {
-                    HStack {
-                        Text("\(selectedYear)")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
+            // View mode toggle and date selector
+            VStack(spacing: 12) {
+                // View mode toggle
+                HStack {
+                    Spacer()
+                    
+                    Picker("View Mode", selection: $viewMode) {
+                        Text("Month").tag(ViewMode.month)
+                        Text("Year").tag(ViewMode.year)
                     }
-                    .foregroundColor(.blue)
+                    .pickerStyle(SegmentedPickerStyle())
+                    .frame(width: 200)
+                    
+                    Spacer()
                 }
                 
-                Spacer()
-                
-                // Year navigation buttons
-                HStack(spacing: 12) {
-                    Button(action: {
-                        selectedYear -= 1
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.title3)
-                            .foregroundColor(.blue)
+                // Date selector based on view mode
+                if viewMode == .month {
+                    // Month view controls
+                    HStack {
+                        Button(action: {
+                            if selectedMonth > 1 {
+                                selectedMonth -= 1
+                            } else {
+                                selectedMonth = 12
+                                selectedYear -= 1
+                            }
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                        }
+                        
+                        Spacer()
+                        
+                        Text(monthYearString)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            if selectedMonth < 12 {
+                                selectedMonth += 1
+                            } else {
+                                selectedMonth = 1
+                                selectedYear += 1
+                            }
+                        }) {
+                            Image(systemName: "chevron.right")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                        }
                     }
-                    
-                    Button(action: {
-                        selectedYear += 1
-                    }) {
-                        Image(systemName: "chevron.right")
-                            .font(.title3)
+                } else {
+                    // Year view controls
+                    HStack {
+                        Button(action: {
+                            showingYearSelector = true
+                        }) {
+                            HStack {
+                                Text("\(selectedYear)")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                Image(systemName: "chevron.down")
+                                    .font(.caption)
+                            }
                             .foregroundColor(.blue)
+                        }
+                        
+                        Spacer()
+                        
+                        // Year navigation buttons
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                selectedYear -= 1
+                            }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Button(action: {
+                                selectedYear += 1
+                            }) {
+                                Image(systemName: "chevron.right")
+                                    .font(.title3)
+                                    .foregroundColor(.blue)
+                            }
+                        }
                     }
                 }
             }
             .padding(.horizontal)
             
-            // Monthly blocks grid (3x4 layout)
+            // Content based on view mode
             ScrollView {
-                LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 8), count: 3), spacing: 12) {
-                    ForEach(1...12, id: \.self) { month in
-                        MonthBlockView(
-                            year: selectedYear,
-                            month: month,
-                            viewModel: viewModel,
-                            onDateTap: { date in
-                                selectedDate = date
-                                showingDateDetail = true
-                            }
-                        )
+                if viewMode == .month {
+                    // Month view - daily calendar grid
+                    MonthCalendarView(
+                        year: selectedYear,
+                        month: selectedMonth,
+                        viewModel: viewModel,
+                        onDateTap: { date in
+                            selectedDate = date
+                            showingDateDetail = true
+                        }
+                    )
+                    .padding()
+                } else {
+                    // Year view - monthly blocks grid (3x4 layout)
+                    LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 8), count: 3), spacing: 12) {
+                        ForEach(1...12, id: \.self) { month in
+                            MonthBlockView(
+                                year: selectedYear,
+                                month: month,
+                                viewModel: viewModel,
+                                onDateTap: { date in
+                                    selectedDate = date
+                                    showingDateDetail = true
+                                }
+                            )
+                        }
                     }
+                    .padding()
                 }
-                .padding()
             }
             
             // Legend
@@ -560,10 +652,10 @@ struct DateDetailView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                let completedHabits = viewModel.habitHistory[dateKey(date)] ?? []
-                let totalHabits = viewModel.habits.count
+                let progress = viewModel.getProgressForDate(date)
+                let allHabits = viewModel.getAllHabitsForDate(date)
                 
-                if totalHabits > 0 {
+                if progress.total > 0 {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Text("Habit Progress")
@@ -571,37 +663,72 @@ struct DateDetailView: View {
                             
                             Spacer()
                             
-                            Text("\(Int((Double(completedHabits.count) / Double(totalHabits)) * 100))%")
+                            Text("\(Int((Double(progress.completed) / Double(progress.total)) * 100))%")
                                 .font(.headline)
                                 .fontWeight(.bold)
                                 .foregroundColor(.green)
                         }
                         
-                        ProgressView(value: Double(completedHabits.count), total: Double(totalHabits))
+                        ProgressView(value: Double(progress.completed), total: Double(progress.total))
                             .progressViewStyle(LinearProgressViewStyle(tint: .green))
                             .frame(height: 10)
                             .scaleEffect(x: 1, y: 1.5, anchor: .center)
                         
-                        Text("\(completedHabits.count) of \(totalHabits) habits completed")
+                        Text("\(progress.completed) of \(progress.total) habits completed")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                 }
                 
-                if !viewModel.habits.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Habits")
-                            .font(.headline)
+                if !allHabits.active.isEmpty || !allHabits.archived.isEmpty {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Active Habits Section
+                        if !allHabits.active.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Habits")
+                                    .font(.headline)
+                                
+                                ForEach(allHabits.active) { habit in
+                                    HStack {
+                                        Image(systemName: viewModel.isHabitCompletedOnDate(habit, date: date) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .green : .gray)
+                                        
+                                        Text(habit.name)
+                                            .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .primary : .secondary)
+                                        
+                                        Spacer()
+                                    }
+                                }
+                            }
+                        }
                         
-                        ForEach(viewModel.habits) { habit in
-                            HStack {
-                                Image(systemName: completedHabits.contains(habit.id) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(completedHabits.contains(habit.id) ? .green : .gray)
+                        // Archived Habits Section
+                        if !allHabits.archived.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Archived Habits")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
                                 
-                                Text(habit.name)
-                                    .foregroundColor(completedHabits.contains(habit.id) ? .primary : .secondary)
-                                
-                                Spacer()
+                                ForEach(allHabits.archived) { habit in
+                                    HStack {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        
+                                        Text(habit.name)
+                                            .foregroundColor(.secondary)
+                                            .strikethrough()
+                                        
+                                        Spacer()
+                                        
+                                        Text("Archived")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 2)
+                                            .background(Color.gray.opacity(0.2))
+                                            .cornerRadius(4)
+                                    }
+                                }
                             }
                         }
                     }

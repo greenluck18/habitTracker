@@ -5,6 +5,7 @@ struct HabitListView: View {
     @State private var showingDeleteHabit = false
     @State private var showingAddHabit = false
     @State private var showingEditHabit = false
+    @State private var showingHistory = false
     
     private let dateFormatter = DateFormatter()
     
@@ -124,6 +125,20 @@ struct HabitListView: View {
             }
             .navigationTitle("My Habits")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showingHistory = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            if !viewModel.deletedHabits.isEmpty {
+                                Circle()
+                                    .fill(Color.red)
+                                    .frame(width: 8, height: 8)
+                            }
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingAddHabit = true
@@ -138,12 +153,29 @@ struct HabitListView: View {
                         Image(systemName: "pencil")
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        viewModel.addMockData()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        viewModel.clearAllData()
+                    } label: {
+                        Image(systemName: "trash.circle.fill")
+                    }
+                }
             }
             .sheet(isPresented: $showingAddHabit) {
                 AddHabitView(viewModel: viewModel)
             }
             .sheet(isPresented: $showingEditHabit) {
                 EditHabitsView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showingHistory) {
+                DeletedHabitHistoryView(viewModel: viewModel)
             }
         }
     }
