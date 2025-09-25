@@ -16,15 +16,15 @@ struct HabitListView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Header with current date and progress
-                VStack(spacing: 8) {
-                    Text(dateFormatter.string(from: Date()))
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-                    
-                    let todayProgress = viewModel.getTodayProgress()
-                    if todayProgress.total > 0 {
+                // Header with current date and progress - only show when there are habits
+                if !viewModel.habits.isEmpty {
+                    VStack(spacing: 8) {
+                        Text(dateFormatter.string(from: Date()))
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                        
+                        let todayProgress = viewModel.getTodayProgress()
                         VStack(spacing: 8) {
                             HStack {
                                 Text("\(todayProgress.completed)/\(todayProgress.total) habits completed today")
@@ -44,15 +44,10 @@ struct HabitListView: View {
                                 .frame(height: 8)
                                 .scaleEffect(x: 1, y: 1.5, anchor: .center) // Make it slightly thicker
                         }
-                    } else {
-                        Text("Add your first habit to start tracking!")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .italic()
                     }
+                    .padding()
+                    .background(Color(.systemGray6))
                 }
-                .padding()
-                .background(Color(.systemGray6))
                 
                 // Habits list
                 if viewModel.habits.isEmpty {
