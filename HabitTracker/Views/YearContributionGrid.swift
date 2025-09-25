@@ -72,7 +72,9 @@ struct MonthBlockView: View {
                         completionCount: day.completionCount,
                         totalHabits: viewModel.habits.count,
                         isToday: calendar.isDateInToday(day.date),
-                        onTap: { onDateTap(day.date) }
+                        onTap: { 
+                            onDateTap(day.date) 
+                        }
                     )
                 }
             }
@@ -98,14 +100,14 @@ struct MonthBlockView: View {
     
     private var completedDays: Int {
         guard let startOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
-              let endOfMonth = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
+              let _ = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
             return 0
         }
         
         var completedCount = 0
         var currentDate = startOfMonth
         
-        while currentDate <= endOfMonth {
+        while currentDate <= calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) ?? currentDate {
             let completionCount = getCompletionCount(for: currentDate)
             if completionCount > 0 {
                 completedCount += 1
@@ -118,7 +120,7 @@ struct MonthBlockView: View {
     
     private var monthDays: [(date: Date, completionCount: Int)] {
         guard let startOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
-              let endOfMonth = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
+              let _ = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
             return []
         }
         

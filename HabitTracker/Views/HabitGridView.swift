@@ -174,8 +174,12 @@ struct HabitGridView: View {
                         month: selectedMonth,
                         viewModel: viewModel,
                         onDateTap: { date in
+                            print("📅 Month view: Date tapped: \(date)")
                             selectedDate = date
-                            showingDateDetail = true
+                            // Use DispatchQueue to ensure state is set before showing sheet
+                            DispatchQueue.main.async {
+                                showingDateDetail = true
+                            }
                         }
                     )
                     .padding()
@@ -199,8 +203,12 @@ struct HabitGridView: View {
                             year: selectedYear,
                             viewModel: viewModel,
                             onDateTap: { date in
+                                print("📅 Year view: Date tapped: \(date)")
                                 selectedDate = date
-                                showingDateDetail = true
+                                // Use DispatchQueue to ensure state is set before showing sheet
+                                DispatchQueue.main.async {
+                                    showingDateDetail = true
+                                }
                             }
                         )
                     }
@@ -230,13 +238,28 @@ struct HabitGridView: View {
             .padding(.horizontal)
         }
         .navigationTitle("Progress")
-        .sheet(isPresented: $showingDateDetail) {
+        .sheet(isPresented: $showingDateDetail, onDismiss: {
+            // Reset selectedDate when sheet is dismissed to prevent state issues
+            selectedDate = nil
+        }) {
             if let selectedDate = selectedDate {
                 DateDetailView(
                     date: selectedDate,
                     viewModel: viewModel,
                     isPresented: $showingDateDetail
                 )
+            } else {
+                // Fallback view if selectedDate is nil
+                VStack {
+                    Text("No date selected")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Button("Close") {
+                        showingDateDetail = false
+                    }
+                    .padding()
+                }
+                .padding()
             }
         }
         .sheet(isPresented: $showingYearSelector) {
@@ -447,6 +470,7 @@ struct DateDetailView: View {
     let date: Date
     @ObservedObject var viewModel: HabitViewModel
     @Binding var isPresented: Bool
+    @State private var isDataLoaded = false
     
     private let dateFormatter = DateFormatter()
     
@@ -464,8 +488,18 @@ struct DateDetailView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                let progress = viewModel.getProgressForDate(date)
-                let allHabits = viewModel.getAllHabitsForDate(date)
+                if !isDataLoaded {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("Loading...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    let progress = viewModel.getProgressForDate(date)
+                    let allHabits = viewModel.getAllHabitsForDate(date)
                 
                 if progress.total > 0 {
                     VStack(alignment: .leading, spacing: 12) {
@@ -549,6 +583,7 @@ struct DateDetailView: View {
                         .foregroundColor(.secondary)
                         .italic()
                 }
+                }
                 
                 Spacer()
             }
@@ -560,6 +595,15 @@ struct DateDetailView: View {
                     Button("Done") {
                         isPresented = false
                     }
+                }
+            }
+            .onAppear {
+                print("📱 DateDetailView appeared for date: \(date)")
+                // Reset and ensure data is loaded when view appears
+                isDataLoaded = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isDataLoaded = true
+                    print("📱 DateDetailView data loaded: \(isDataLoaded)")
                 }
             }
         }

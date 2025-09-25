@@ -117,7 +117,9 @@ struct MonthCalendarView: View {
                             completionCount: contributionDay.completionCount,
                             totalHabits: viewModel.habits.count,
                             isToday: calendar.isDateInToday(contributionDay.date),
-                            onTap: { onDateTap(contributionDay.date) }
+                            onTap: { 
+                                onDateTap(contributionDay.date) 
+                            }
                         )
                     }
                 }
