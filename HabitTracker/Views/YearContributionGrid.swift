@@ -87,19 +87,48 @@ struct MonthBlockView: View {
     private var monthName: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM"
-        let date = calendar.date(from: DateComponents(year: year, month: month)) ?? Date()
+        
+        // Create date components for the first day of the month in local timezone
+        var dateComponents = DateComponents()
+        dateComponents.year = year
+        dateComponents.month = month
+        dateComponents.day = 1
+        dateComponents.hour = 12 // Set to noon to avoid timezone issues
+        dateComponents.minute = 0
+        dateComponents.second = 0
+        
+        let date = calendar.date(from: dateComponents) ?? Date()
         return formatter.string(from: date)
     }
     
     private var totalDays: Int {
-        guard let range = calendar.range(of: .day, in: .month, for: calendar.date(from: DateComponents(year: year, month: month)) ?? Date()) else {
+        // Create date components for the first day of the month in local timezone
+        var dateComponents = DateComponents()
+        dateComponents.year = year
+        dateComponents.month = month
+        dateComponents.day = 1
+        dateComponents.hour = 12 // Set to noon to avoid timezone issues
+        dateComponents.minute = 0
+        dateComponents.second = 0
+        
+        guard let firstOfMonth = calendar.date(from: dateComponents),
+              let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else {
             return 0
         }
         return range.count
     }
     
     private var completedDays: Int {
-        guard let startOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+        // Create date components for the first day of the month in local timezone
+        var dateComponents = DateComponents()
+        dateComponents.year = year
+        dateComponents.month = month
+        dateComponents.day = 1
+        dateComponents.hour = 12 // Set to noon to avoid timezone issues
+        dateComponents.minute = 0
+        dateComponents.second = 0
+        
+        guard let startOfMonth = calendar.date(from: dateComponents),
               let _ = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
             return 0
         }
@@ -119,7 +148,16 @@ struct MonthBlockView: View {
     }
     
     private var monthDays: [(date: Date, completionCount: Int)] {
-        guard let startOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+        // Create date components for the first day of the month in local timezone
+        var dateComponents = DateComponents()
+        dateComponents.year = year
+        dateComponents.month = month
+        dateComponents.day = 1
+        dateComponents.hour = 12 // Set to noon to avoid timezone issues
+        dateComponents.minute = 0
+        dateComponents.second = 0
+        
+        guard let startOfMonth = calendar.date(from: dateComponents),
               let _ = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
             return []
         }

@@ -128,7 +128,16 @@ struct MonthCalendarView: View {
     }
     
     private var calendarDays: [Date] {
-        guard let firstOfMonth = calendar.date(from: DateComponents(year: year, month: month, day: 1)),
+        // Create date components for the first day of the month in local timezone
+        var dateComponents = DateComponents()
+        dateComponents.year = year
+        dateComponents.month = month
+        dateComponents.day = 1
+        dateComponents.hour = 12 // Set to noon to avoid timezone issues
+        dateComponents.minute = 0
+        dateComponents.second = 0
+        
+        guard let firstOfMonth = calendar.date(from: dateComponents),
               let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else {
             return []
         }
