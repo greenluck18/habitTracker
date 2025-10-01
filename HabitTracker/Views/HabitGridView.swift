@@ -497,15 +497,20 @@ struct DateDetailView: View {
                                     .font(.headline)
                                 
                                 ForEach(allHabits.active) { habit in
-                                    HStack {
-                                        Image(systemName: viewModel.isHabitCompletedOnDate(habit, date: date) ? "checkmark.circle.fill" : "circle")
-                                            .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .green : .gray)
-                                        
-                                        Text(habit.name)
-                                            .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .primary : .secondary)
-                                        
-                                        Spacer()
+                                    Button(action: {
+                                        viewModel.toggleHabitCompletion(habit, for: date)
+                                    }) {
+                                        HStack {
+                                            Image(systemName: viewModel.isHabitCompletedOnDate(habit, date: date) ? "checkmark.circle.fill" : "circle")
+                                                .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .green : .gray)
+
+                                            Text(habit.name)
+                                                .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .primary : .secondary)
+
+                                            Spacer()
+                                        }
                                     }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                         }

@@ -52,14 +52,14 @@ class HabitViewModel: ObservableObject {
     }
 
     func addHabit(name: String) {
-        guard habits.count < 10 else { return }
+        guard habits.count < 10000 else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
-        
+
         let newHabit = Habit(id: UUID(), name: trimmedName)
         habits.append(newHabit)
         save()
-        
+
         // Log the addition for debugging
         print("✅ Added habit: \(trimmedName)")
     }
@@ -372,9 +372,13 @@ class HabitViewModel: ObservableObject {
         while currentDate <= today {
             let key = dateKey(currentDate)
 
-            // For each habit, randomly decide if it's completed (80% chance)
+            // Randomly decide if this day has high or low completion (50% chance for each)
+            let isLowCompletionDay = Double.random(in: 0...1) < 0.5
+            let completionRate = isLowCompletionDay ? 0.3 : 0.7 // Low days: 30%, High days: 70%
+
+            // For each habit, randomly decide if it's completed based on the day's completion rate
             for habit in habits {
-                let isCompleted = Double.random(in: 0...1) > 0.2
+                let isCompleted = Double.random(in: 0...1) < completionRate
 
                 if isCompleted {
                     // Add to daily history

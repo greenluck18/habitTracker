@@ -61,6 +61,7 @@ struct MonthBlockView: View {
                         completionCount: day.completionCount,
                         totalHabits: viewModel.habits.count,
                         isToday: calendar.isDateInToday(day.date),
+                        isCurrentMonth: day.isCurrentMonth,
                         onTap: {
                             onDateTap(day.date)
                         }
@@ -136,7 +137,7 @@ struct MonthBlockView: View {
         return completedCount
     }
     
-    private var monthDays: [(date: Date, completionCount: Int)] {
+    private var monthDays: [(date: Date, completionCount: Int, isCurrentMonth: Bool)] {
         // Create date components for the first day of the month in local timezone
         var dateComponents = DateComponents()
         dateComponents.year = year
@@ -145,29 +146,29 @@ struct MonthBlockView: View {
         dateComponents.hour = 12 // Set to noon to avoid timezone issues
         dateComponents.minute = 0
         dateComponents.second = 0
-        
-        guard let startOfMonth = calendar.date(from: dateComponents),
-              let _ = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
+
+        guard let startOfMonth = calendar.date(from: dateComponents) else {
             return []
         }
-        
+
         // Find the Sunday of the week containing startOfMonth
         let weekday = calendar.component(.weekday, from: startOfMonth)
         let daysToSubtract = (weekday - 1) % 7
         let gridStartDate = calendar.date(byAdding: .day, value: -daysToSubtract, to: startOfMonth) ?? startOfMonth
-        
+
         var dates: [Date] = []
         var currentDate = gridStartDate
-        
+
         // Generate 6 weeks worth of dates (42 days) to fill the calendar grid
         for _ in 0..<42 {
             dates.append(currentDate)
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
         }
-        
+
         return dates.map { date in
             let completionCount = getCompletionCount(for: date)
-            return (date: date, completionCount: completionCount)
+            let isCurrentMonth = calendar.component(.month, from: date) == month
+            return (date: date, completionCount: completionCount, isCurrentMonth: isCurrentMonth)
         }
     }
     
@@ -189,10 +190,12 @@ struct MonthContributionCell: View {
     let completionCount: Int
     let totalHabits: Int
     let isToday: Bool
+    let isCurrentMonth: Bool
     let onTap: () -> Void
-    
+
     private let calendar = Calendar.current
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         Button(action: onTap) {
             Rectangle()
@@ -200,21 +203,32 @@ struct MonthContributionCell: View {
                 .frame(width: 12, height: 12)
                 .overlay(
                     Rectangle()
-                        .stroke(isToday ? Color.blue : Color.clear, lineWidth: 1)
+                        .stroke(isToday && isCurrentMonth ? Color.blue : Color.clear, lineWidth: 1)
                 )
         }
         .buttonStyle(PlainButtonStyle())
     }
-    
+
     private var backgroundColor: Color {
-        if completionCount == 0 {
+        // Days from other months use same color as zero completion
+        if !isCurrentMonth {
             return Color(.systemGray5)
-        } else if completionCount == 1 {
+        }
+
+        if totalHabits == 0 || completionCount == 0 {
+            return Color(.systemGray5)
+        }
+
+        let percentage = Double(completionCount) / Double(totalHabits)
+
+        if percentage <= 0.2 {
             return Color.green.opacity(0.3)
-        } else if completionCount == 2 {
-            return Color.green.opacity(0.6)
-        } else if completionCount == 3 {
-            return Color.green.opacity(0.8)
+        } else if percentage <= 0.4 {
+            return Color.green.opacity(0.5)
+        } else if percentage <= 0.6 {
+            return Color.green.opacity(0.7)
+        } else if percentage <= 0.8 {
+            return Color.green.opacity(0.85)
         } else {
             return Color.green
         }

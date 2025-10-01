@@ -136,29 +136,28 @@ struct MonthCalendarView: View {
         dateComponents.hour = 12 // Set to noon to avoid timezone issues
         dateComponents.minute = 0
         dateComponents.second = 0
-        
+
         guard let firstOfMonth = calendar.date(from: dateComponents),
               let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else {
             return []
         }
-        
-        // Get the first day of the week for the first day of the month
-        let firstWeekday = calendar.component(.weekday, from: firstOfMonth)
-        let daysToSubtract = (firstWeekday - 1) % 7 // Convert to 0-based (Sunday = 0)
-        
-        // Start from the Sunday of the week containing the first day of the month
-        guard let startDate = calendar.date(byAdding: .day, value: -daysToSubtract, to: firstOfMonth) else {
-            return []
-        }
-        
-        // Generate 42 days (6 weeks) to fill the calendar grid
+
+        // Generate only days from this month
         var days: [Date] = []
-        for i in 0..<42 {
-            if let date = calendar.date(byAdding: .day, value: i, to: startDate) {
+        for day in 1...range.count {
+            var dayComponents = DateComponents()
+            dayComponents.year = year
+            dayComponents.month = month
+            dayComponents.day = day
+            dayComponents.hour = 12
+            dayComponents.minute = 0
+            dayComponents.second = 0
+
+            if let date = calendar.date(from: dayComponents) {
                 days.append(date)
             }
         }
-        
+
         return days
     }
     
