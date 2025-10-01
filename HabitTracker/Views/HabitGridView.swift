@@ -135,9 +135,10 @@ struct HabitGridView: View {
                         Button(action: {
                             showingYearSelector = true
                         }) {
-                            HStack {
-                                Text("\(selectedYear)")
+                            HStack(spacing: 4) {
+                                Text(String(selectedYear))
                                     .font(.system(size: 22, weight: .semibold))
+                                    .kerning(0)
                                 Image(systemName: "chevron.down")
                                     .font(.caption)
                             }
@@ -391,25 +392,27 @@ struct YearSelectorView: View {
                     .fontWeight(.semibold)
                     .padding(.top)
                 
-                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 3), spacing: 16) {
+                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 4), spacing: 16) {
                     ForEach(availableYears(), id: \.self) { year in
                         Button(action: {
                             selectedYear = year
                             isPresented = false
                         }) {
-                            VStack {
-                                Text("\(year)")
-                                    .font(.system(size: 34, weight: .bold))
+                            VStack(spacing: 4) {
+                                Text(String(year))
+                                    .font(.system(size: 28, weight: .bold))
                                     .foregroundColor(selectedYear == year ? .white : .primary)
-                                
+                                    .kerning(0)
+
                                 if year == currentYear {
                                     Text("Current")
                                         .font(.caption)
                                         .foregroundColor(selectedYear == year ? .white : .secondary)
                                 }
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                            .frame(maxWidth: .infinity, minHeight: 60)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 4)
                             .background(selectedYear == year ? Color.blue : Color(.systemGray6))
                             .cornerRadius(12)
                         }
