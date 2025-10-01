@@ -185,28 +185,13 @@ struct HabitGridView: View {
                     .padding()
                 } else {
                     // Year view - unified contribution grid
-                    VStack(spacing: 8) {
-                        // Month labels
-                        HStack(spacing: 0) {
-                            ForEach(1...12, id: \.self) { month in
-                                Text(monthName(for: month))
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.secondary)
-                                    .frame(maxWidth: .infinity)
-                            }
+                    YearContributionGrid(
+                        year: selectedYear,
+                        viewModel: viewModel,
+                        onDateTap: { date in
+                            selectedDate = IdentifiableDate(date: date)
                         }
-                        .padding(.horizontal)
-                        
-                        // Unified contribution grid
-                        YearContributionGrid(
-                            year: selectedYear,
-                            viewModel: viewModel,
-                            onDateTap: { date in
-                                selectedDate = IdentifiableDate(date: date)
-                            }
-                        )
-                    }
+                    )
                     .padding()
                 }
             }

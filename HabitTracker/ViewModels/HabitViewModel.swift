@@ -347,8 +347,75 @@ class HabitViewModel: ObservableObject {
     func getProgressForDate(_ date: Date) -> (completed: Int, total: Int) {
         let allHabits = getAllHabitsForDate(date)
         let allRelevantHabits = allHabits.active + allHabits.archived
-        
+
         let completedCount = allRelevantHabits.filter { isHabitCompletedOnDate($0, date: date) }.count
         return (completed: completedCount, total: allRelevantHabits.count)
+    }
+
+    // MARK: - Developer Mode
+
+    /// Adds mock completion data for all active habits from start of year to current date
+    func addMocksForCurrentYear() {
+        let calendar = Calendar.current
+        let today = Date()
+        let currentYear = calendar.component(.year, from: today)
+
+        guard let startOfYear = calendar.date(from: DateComponents(year: currentYear, month: 1, day: 1)) else {
+            print("❌ Failed to create year boundaries")
+            return
+        }
+
+        var currentDate = startOfYear
+        var addedDaysCount = 0
+
+        // Iterate from start of year to today (no future dates)
+        while currentDate <= today {
+            let key = dateKey(currentDate)
+
+            // For each habit, randomly decide if it's completed (80% chance)
+            for habit in habits {
+                let isCompleted = Double.random(in: 0...1) > 0.2
+
+                if isCompleted {
+                    // Add to daily history
+                    var completed = habitHistory[key, default: []]
+                    if !completed.contains(habit.id) {
+                        completed.append(habit.id)
+                        habitHistory[key] = completed
+                    }
+
+                    // Add to habit's completion history
+                    if let index = habits.firstIndex(where: { $0.id == habit.id }) {
+                        if !habits[index].completionHistory.contains(key) {
+                            habits[index].completionHistory.append(key)
+                        }
+                    }
+                }
+            }
+
+            addedDaysCount += 1
+            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
+        }
+
+        save()
+        print("✅ Added mock data for \(addedDaysCount) days from start of year to today")
+    }
+
+    /// Deletes all mock data (clears all completion history)
+    func deleteAllMocks() {
+        habitHistory.removeAll()
+
+        // Clear completion history from all habits
+        for index in habits.indices {
+            habits[index].completionHistory.removeAll()
+        }
+
+        // Clear completion history from deleted habits
+        for index in deletedHabits.indices {
+            deletedHabits[index].completionHistory.removeAll()
+        }
+
+        save()
+        print("✅ Deleted all mock data")
     }
 }

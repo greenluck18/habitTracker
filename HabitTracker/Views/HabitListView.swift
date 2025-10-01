@@ -6,6 +6,9 @@ struct HabitListView: View {
     @State private var showingAddHabit = false
     @State private var showingEditHabit = false
     @State private var showingHistory = false
+    @State private var showingDeveloperMode = false
+    @State private var titleTapCount = 0
+    @State private var tapResetTimer: Timer?
     
     private let dateFormatter = DateFormatter()
     
@@ -118,8 +121,17 @@ struct HabitListView: View {
                 }
                 .padding()
             }
-            .navigationTitle("My Habits")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Button(action: {
+                        handleTitleTap()
+                    }) {
+                        Text("My Habits")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         showingHistory = true
@@ -157,6 +169,35 @@ struct HabitListView: View {
             }
             .sheet(isPresented: $showingHistory) {
                 DeletedHabitHistoryView(viewModel: viewModel)
+            }
+            .alert("Developer Mode", isPresented: $showingDeveloperMode) {
+                Button("Add Mocks") {
+                    viewModel.addMocksForCurrentYear()
+                }
+                Button("Delete Mocks", role: .destructive) {
+                    viewModel.deleteAllMocks()
+                }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Do you want to add or delete mock data?")
+            }
+        }
+    }
+
+    private func handleTitleTap() {
+        titleTapCount += 1
+
+        // Cancel existing timer
+        tapResetTimer?.invalidate()
+
+        // Check if reached 7 taps
+        if titleTapCount == 7 {
+            showingDeveloperMode = true
+            titleTapCount = 0
+        } else {
+            // Reset counter after 2 seconds of inactivity
+            tapResetTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
+                titleTapCount = 0
             }
         }
     }

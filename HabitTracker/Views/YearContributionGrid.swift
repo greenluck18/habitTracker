@@ -45,25 +45,14 @@ struct MonthBlockView: View {
                 Text(monthName)
                     .font(.headline)
                     .fontWeight(.semibold)
-                
+
                 Spacer()
-                
+
                 Text("\(completedDays)/\(totalDays)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
-            // Weekday headers
-            HStack(spacing: 1) {
-                ForEach(Array(["S", "M", "T", "W", "T", "F", "S"].enumerated()), id: \.offset) { index, day in
-                    Text(day)
-                        .font(.caption2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            
+
             // Month grid
             LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 1), count: 7), spacing: 1) {
                 ForEach(monthDays, id: \.date) { day in
@@ -72,8 +61,8 @@ struct MonthBlockView: View {
                         completionCount: day.completionCount,
                         totalHabits: viewModel.habits.count,
                         isToday: calendar.isDateInToday(day.date),
-                        onTap: { 
-                            onDateTap(day.date) 
+                        onTap: {
+                            onDateTap(day.date)
                         }
                     )
                 }
