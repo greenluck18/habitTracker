@@ -7,19 +7,20 @@
 
 import SwiftUI
 
+// Identifiable wrapper for Date to use with sheet(item:)
+struct IdentifiableDate: Identifiable {
+    let id = UUID()
+    let date: Date
+}
+
 struct HabitGridView: View {
     @EnvironmentObject var viewModel: HabitViewModel
-    @State private var selectedDate: Date?
-    @State private var showingDateDetail = false
-    @State private var sheetContent: Date? = nil
-    @State private var currentSheetDate: Date? = nil
-    @State private var sheetDisplayDate: Date? = nil
-    @State private var pendingSheetDate: Date? = nil
+    @State private var selectedDate: IdentifiableDate?
     @State private var selectedYear = Calendar.current.component(.year, from: Date())
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var showingYearSelector = false
     @State private var viewMode: ViewMode = .month // Default to month view
-    
+
     enum ViewMode {
         case month
         case year
@@ -178,26 +179,7 @@ struct HabitGridView: View {
                         month: selectedMonth,
                         viewModel: viewModel,
                         onDateTap: { date in
-                            print("📅 Month view: Date tapped: \(date)")
-                            
-                            // First, set the pending date
-                            pendingSheetDate = date
-                            print("📱 pendingSheetDate set to: \(pendingSheetDate ?? Date())")
-                            
-                            // Then use DispatchQueue to update the main state and show sheet
-                            DispatchQueue.main.async {
-                                selectedDate = date
-                                sheetContent = date
-                                currentSheetDate = date
-                                sheetDisplayDate = date
-                                print("📱 selectedDate set to: \(selectedDate ?? Date())")
-                                print("📱 sheetContent set to: \(sheetContent ?? Date())")
-                                print("📱 currentSheetDate set to: \(currentSheetDate ?? Date())")
-                                print("📱 sheetDisplayDate set to: \(sheetDisplayDate ?? Date())")
-                                print("📱 About to set showingDateDetail = true")
-                                showingDateDetail = true
-                                print("📱 showingDateDetail is now: \(showingDateDetail)")
-                            }
+                            selectedDate = IdentifiableDate(date: date)
                         }
                     )
                     .padding()
@@ -221,26 +203,7 @@ struct HabitGridView: View {
                             year: selectedYear,
                             viewModel: viewModel,
                             onDateTap: { date in
-                                print("📅 Year view: Date tapped: \(date)")
-                                
-                                // First, set the pending date
-                                pendingSheetDate = date
-                                print("📱 pendingSheetDate set to: \(pendingSheetDate ?? Date())")
-                                
-                                // Then use DispatchQueue to update the main state and show sheet
-                                DispatchQueue.main.async {
-                                    selectedDate = date
-                                    sheetContent = date
-                                    currentSheetDate = date
-                                    sheetDisplayDate = date
-                                    print("📱 selectedDate set to: \(selectedDate ?? Date())")
-                                    print("📱 sheetContent set to: \(sheetContent ?? Date())")
-                                    print("📱 currentSheetDate set to: \(currentSheetDate ?? Date())")
-                                    print("📱 sheetDisplayDate set to: \(sheetDisplayDate ?? Date())")
-                                    print("📱 About to set showingDateDetail = true")
-                                    showingDateDetail = true
-                                    print("📱 showingDateDetail is now: \(showingDateDetail)")
-                                }
+                                selectedDate = IdentifiableDate(date: date)
                             }
                         )
                     }
@@ -270,45 +233,11 @@ struct HabitGridView: View {
             .padding(.horizontal)
         }
         .navigationTitle("Progress")
-        .sheet(isPresented: $showingDateDetail) {
-            let _ = print("📱 Sheet evaluation: pendingSheetDate = \(pendingSheetDate?.description ?? "nil")")
-            if let date = pendingSheetDate {
-                DateDetailView(
-                    date: date,
-                    viewModel: viewModel,
-                    isPresented: $showingDateDetail,
-                    onDismiss: {
-                        self.selectedDate = nil
-                        self.sheetContent = nil
-                        self.currentSheetDate = nil
-                        self.sheetDisplayDate = nil
-                        self.pendingSheetDate = nil
-                    }
-                )
-            } else {
-                // Fallback view if pendingSheetDate is nil
-                VStack {
-                    Text("No date selected")
-                        .font(.title2)
-                        .foregroundColor(.secondary)
-                    Text("Debug: pendingSheetDate is \(pendingSheetDate?.description ?? "nil")")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    Text("Debug: selectedDate is \(selectedDate?.description ?? "nil")")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                    Button("Close") {
-                        showingDateDetail = false
-                        self.selectedDate = nil
-                        self.sheetContent = nil
-                        self.currentSheetDate = nil
-                        self.sheetDisplayDate = nil
-                        self.pendingSheetDate = nil
-                    }
-                    .padding()
-                }
-                .padding()
-            }
+        .sheet(item: $selectedDate) { identifiableDate in
+            DateDetailView(
+                date: identifiableDate.date,
+                viewModel: viewModel
+            )
         }
         .sheet(isPresented: $showingYearSelector) {
             YearSelectorView(selectedYear: $selectedYear, isPresented: $showingYearSelector)
@@ -517,17 +446,14 @@ struct YearSelectorView: View {
 struct DateDetailView: View {
     let date: Date
     @ObservedObject var viewModel: HabitViewModel
-    @Binding var isPresented: Bool
-    let onDismiss: (() -> Void)?
+    @Environment(\.dismiss) private var dismiss
     @State private var isDataLoaded = false
-    
+
     private let dateFormatter = DateFormatter()
-    
-    init(date: Date, viewModel: HabitViewModel, isPresented: Binding<Bool>, onDismiss: (() -> Void)? = nil) {
+
+    init(date: Date, viewModel: HabitViewModel) {
         self.date = date
         self.viewModel = viewModel
-        self._isPresented = isPresented
-        self.onDismiss = onDismiss
         dateFormatter.dateFormat = "EEEE, MMM d, yyyy"
     }
     
@@ -643,18 +569,15 @@ struct DateDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        isPresented = false
-                        onDismiss?()
+                        dismiss()
                     }
                 }
             }
             .onAppear {
-                print("📱 DateDetailView appeared for date: \(date)")
-                // Reset and ensure data is loaded when view appears
+                // Ensure data is loaded when view appears
                 isDataLoaded = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isDataLoaded = true
-                    print("📱 DateDetailView data loaded: \(isDataLoaded)")
                 }
             }
         }
