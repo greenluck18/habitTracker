@@ -148,20 +148,6 @@ struct HabitListView: View {
                         Image(systemName: "pencil")
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        viewModel.addMockData()
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        viewModel.clearAllData()
-                    } label: {
-                        Image(systemName: "trash.circle.fill")
-                    }
-                }
             }
             .sheet(isPresented: $showingAddHabit) {
                 AddHabitView(viewModel: viewModel)

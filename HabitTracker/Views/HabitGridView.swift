@@ -137,8 +137,7 @@ struct HabitGridView: View {
                         }) {
                             HStack {
                                 Text("\(selectedYear)")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
+                                    .font(.system(size: 22, weight: .semibold))
                                 Image(systemName: "chevron.down")
                                     .font(.caption)
                             }
@@ -400,8 +399,7 @@ struct YearSelectorView: View {
                         }) {
                             VStack {
                                 Text("\(year)")
-                                    .font(.title)
-                                    .fontWeight(.bold)
+                                    .font(.system(size: 34, weight: .bold))
                                     .foregroundColor(selectedYear == year ? .white : .primary)
                                 
                                 if year == currentYear {
