@@ -138,7 +138,7 @@ The app uses SwiftUI's built-in styling with:
 
 ## License
 
-This project is available under the MIT License. See the LICENSE file for more details.
+This project is available under the MIT License.
 
 ## Author
 
