@@ -22,6 +22,12 @@ class HabitViewModel: ObservableObject {
         // Clean up any orphaned habit history entries
         cleanupOrphanedHabitHistory()
     }
+    
+    /// Call this method when the day changes to refresh the view
+    func refreshForNewDay() {
+        // Force a UI update by triggering a published property change
+        objectWillChange.send()
+    }
 
     func toggleHabitCompletion(_ habit: Habit, for date: Date = Date()) {
         let key = dateKey(date)

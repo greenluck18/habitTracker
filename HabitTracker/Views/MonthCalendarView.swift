@@ -28,7 +28,7 @@ struct MonthCalendarView: View {
     
     private var weekdayHeaders: [(id: Int, name: String)] {
         [
-            (0, "S"), (1, "M"), (2, "T"), (3, "W"), (4, "T"), (5, "F"), (6, "S")
+            (0, "M"), (1, "T"), (2, "W"), (3, "T"), (4, "F"), (5, "S"), (6, "S")
         ]
     }
     
@@ -137,28 +137,26 @@ struct MonthCalendarView: View {
         dateComponents.minute = 0
         dateComponents.second = 0
 
-        guard let firstOfMonth = calendar.date(from: dateComponents),
-              let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else {
+        guard let firstOfMonth = calendar.date(from: dateComponents) else {
             return []
         }
 
-        // Generate only days from this month
-        var days: [Date] = []
-        for day in 1...range.count {
-            var dayComponents = DateComponents()
-            dayComponents.year = year
-            dayComponents.month = month
-            dayComponents.day = day
-            dayComponents.hour = 12
-            dayComponents.minute = 0
-            dayComponents.second = 0
+        // Find the Monday of the week containing firstOfMonth
+        let weekday = calendar.component(.weekday, from: firstOfMonth)
+        // Convert Sunday=1, Monday=2, ..., Saturday=7 to Monday=0, Tuesday=1, ..., Sunday=6
+        let mondayOffset = (weekday + 5) % 7
+        let gridStartDate = calendar.date(byAdding: .day, value: -mondayOffset, to: firstOfMonth) ?? firstOfMonth
 
-            if let date = calendar.date(from: dayComponents) {
-                days.append(date)
-            }
+        var dates: [Date] = []
+        var currentDate = gridStartDate
+
+        // Generate 6 weeks worth of dates (42 days) to fill the calendar grid
+        for _ in 0..<42 {
+            dates.append(currentDate)
+            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
         }
 
-        return days
+        return dates
     }
     
     private func getCompletionCount(for date: Date) -> Int {

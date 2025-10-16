@@ -20,6 +20,8 @@ struct HabitGridView: View {
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var showingYearSelector = false
     @State private var viewMode: ViewMode = .month // Default to month view
+    @State private var currentDate = Date()
+    @State private var dayChangeTimer: Timer?
 
     enum ViewMode {
         case month
@@ -51,7 +53,7 @@ struct HabitGridView: View {
         VStack(spacing: 16) {
             // Current date and stats header
             VStack(spacing: 8) {
-                Text("Today: \(dateFormatter.string(from: Date()))")
+                Text("Today: \(dateFormatter.string(from: currentDate))")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -227,6 +229,12 @@ struct HabitGridView: View {
         .sheet(isPresented: $showingYearSelector) {
             YearSelectorView(selectedYear: $selectedYear, isPresented: $showingYearSelector)
         }
+        .onAppear {
+            startDayChangeTimer()
+        }
+        .onDisappear {
+            stopDayChangeTimer()
+        }
     }
     
     private func generateContributionDatesForYear(_ year: Int) -> [Date] {
@@ -296,6 +304,43 @@ struct HabitGridView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
+    }
+    
+    private func startDayChangeTimer() {
+        // Stop any existing timer
+        stopDayChangeTimer()
+        
+        // Calculate time until next midnight
+        let calendar = Calendar.current
+        let now = Date()
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
+        let nextMidnight = calendar.startOfDay(for: tomorrow)
+        let timeUntilMidnight = nextMidnight.timeIntervalSince(now)
+        
+        // Set timer to fire at midnight
+        dayChangeTimer = Timer.scheduledTimer(withTimeInterval: timeUntilMidnight, repeats: false) { _ in
+            // Day has changed, update the current date
+            currentDate = Date()
+            
+            // Restart the timer for the next day
+            startDayChangeTimer()
+        }
+        
+        // Also set up a timer that checks every minute to catch any edge cases
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            let now = Date()
+            let calendar = Calendar.current
+            
+            // Check if the day has changed
+            if !calendar.isDate(currentDate, inSameDayAs: now) {
+                currentDate = now
+            }
+        }
+    }
+    
+    private func stopDayChangeTimer() {
+        dayChangeTimer?.invalidate()
+        dayChangeTimer = nil
     }
 }
 

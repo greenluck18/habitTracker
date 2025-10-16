@@ -9,6 +9,8 @@ struct HabitListView: View {
     @State private var showingDeveloperMode = false
     @State private var titleTapCount = 0
     @State private var tapResetTimer: Timer?
+    @State private var currentDate = Date()
+    @State private var dayChangeTimer: Timer?
     
     private let dateFormatter = DateFormatter()
     
@@ -22,7 +24,7 @@ struct HabitListView: View {
                 // Header with current date and progress - only show when there are habits
                 if !viewModel.habits.isEmpty {
                     VStack(spacing: 8) {
-                        Text(dateFormatter.string(from: Date()))
+                        Text(dateFormatter.string(from: currentDate))
                             .font(.title2)
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
@@ -182,6 +184,12 @@ struct HabitListView: View {
                 Text("Do you want to add or delete mock data?")
             }
         }
+        .onAppear {
+            startDayChangeTimer()
+        }
+        .onDisappear {
+            stopDayChangeTimer()
+        }
     }
 
     private func handleTitleTap() {
@@ -200,5 +208,52 @@ struct HabitListView: View {
                 titleTapCount = 0
             }
         }
+    }
+    
+    private func startDayChangeTimer() {
+        // Stop any existing timer
+        stopDayChangeTimer()
+        
+        // Calculate time until next midnight
+        let calendar = Calendar.current
+        let now = Date()
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
+        let nextMidnight = calendar.startOfDay(for: tomorrow)
+        let timeUntilMidnight = nextMidnight.timeIntervalSince(now)
+        
+        // Set timer to fire at midnight
+        dayChangeTimer = Timer.scheduledTimer(withTimeInterval: timeUntilMidnight, repeats: false) { _ in
+            // Day has changed, update the current date
+            currentDate = Date()
+            
+            // Debug: Print when day changes
+            print("🔄 Day changed! New date: \(currentDate)")
+            
+            // Refresh the view model to update all data
+            viewModel.refreshForNewDay()
+            
+            // Restart the timer for the next day
+            startDayChangeTimer()
+        }
+        
+        // Also set up a timer that checks every minute to catch any edge cases
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            let now = Date()
+            let calendar = Calendar.current
+            
+            // Check if the day has changed
+            if !calendar.isDate(currentDate, inSameDayAs: now) {
+                currentDate = now
+                // Debug: Print when day changes via fallback timer
+                print("🔄 Day changed via fallback timer! New date: \(currentDate)")
+                // Refresh the view model to update all data
+                viewModel.refreshForNewDay()
+            }
+        }
+    }
+    
+    private func stopDayChangeTimer() {
+        dayChangeTimer?.invalidate()
+        dayChangeTimer = nil
     }
 }
