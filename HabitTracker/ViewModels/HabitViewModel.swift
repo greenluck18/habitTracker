@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UIKit
 
 class HabitViewModel: ObservableObject {
     @Published var habits: [Habit] = []
@@ -16,11 +17,17 @@ class HabitViewModel: ObservableObject {
     private let habitsKey = "habits"
     private let deletedHabitsKey = "deletedHabits"
     private let historyKey = "habitHistory"
+    private let historyTimestampsKey = "habitHistoryTimestamps"
+
+    /// Tracks when each date's completions were last modified locally (unix timestamp).
+    /// Used to resolve iCloud merge conflicts: the newer write wins instead of union.
+    private var habitHistoryTimestamps: [String: TimeInterval] = [:]
 
     init() {
         load()
         // Clean up any orphaned habit history entries
         cleanupOrphanedHabitHistory()
+        setupICloudSync()
     }
     
     /// Call this method when the day changes to refresh the view
@@ -49,6 +56,7 @@ class HabitViewModel: ObservableObject {
             }
         }
         habitHistory[key] = completed
+        habitHistoryTimestamps[key] = Date().timeIntervalSince1970
         save()
     }
 
@@ -159,9 +167,16 @@ class HabitViewModel: ObservableObject {
         } catch {
             print("❌ Failed to save habit history: \(error)")
         }
+
+        // Save habit history timestamps
+        if let timestampsData = try? encoder.encode(habitHistoryTimestamps) {
+            UserDefaults.standard.set(timestampsData, forKey: historyTimestampsKey)
+        }
         
         // Force synchronization to ensure data is written to disk
         UserDefaults.standard.synchronize()
+
+        saveToICloud()
     }
 
     private func load() {
@@ -207,6 +222,12 @@ class HabitViewModel: ObservableObject {
             }
         } else {
             print("ℹ️ No habit history data found in UserDefaults")
+        }
+
+        // Load habit history timestamps
+        if let timestampsData = UserDefaults.standard.data(forKey: historyTimestampsKey),
+           let loadedTimestamps = try? decoder.decode([String: TimeInterval].self, from: timestampsData) {
+            habitHistoryTimestamps = loadedTimestamps
         }
     }
 
@@ -427,5 +448,188 @@ class HabitViewModel: ObservableObject {
 
         save()
         print("✅ Deleted all mock data")
+    }
+
+    // MARK: - iCloud Sync
+
+    private let iCloudStore = NSUbiquitousKeyValueStore.default
+    /// True when iCloud KV store is available (user is signed in).
+    @Published var iCloudSyncEnabled: Bool = false
+    /// Timestamp of the last successful sync with iCloud.
+    @Published var lastSyncDate: Date?
+
+    private var iCloudChangeObserver: NSObjectProtocol?
+    private var foregroundObserver: NSObjectProtocol?
+
+    private func setupICloudSync() {
+        // iCloud is unavailable when the user isn't signed in or parental controls block it.
+        guard FileManager.default.ubiquityIdentityToken != nil else {
+            print("ℹ️ iCloud not available — continuing with local storage only")
+            return
+        }
+        iCloudSyncEnabled = true
+
+        // React to changes pushed from other devices.
+        iCloudChangeObserver = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: iCloudStore,
+            queue: .main
+        ) { [weak self] _ in
+            self?.mergeFromICloud()
+        }
+
+        // Re-sync whenever the app returns to the foreground.
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.iCloudStore.synchronize()
+            self?.mergeFromICloud()
+        }
+
+        // Pull any data already in iCloud right now.
+        iCloudStore.synchronize()
+        mergeFromICloud()
+        print("☁️ iCloud sync enabled")
+    }
+
+    /// Merges iCloud data into local state using a union strategy (never lose completions).
+    private func mergeFromICloud() {
+        let decoder = JSONDecoder()
+
+        let iCloudHabits: [Habit]
+        if let data = iCloudStore.data(forKey: habitsKey),
+           let decoded = try? decoder.decode([Habit].self, from: data) {
+            iCloudHabits = decoded
+        } else {
+            iCloudHabits = []
+        }
+
+        let iCloudDeleted: [Habit]
+        if let data = iCloudStore.data(forKey: deletedHabitsKey),
+           let decoded = try? decoder.decode([Habit].self, from: data) {
+            iCloudDeleted = decoded
+        } else {
+            iCloudDeleted = []
+        }
+
+        let iCloudHistory: [String: [UUID]]
+        if let data = iCloudStore.data(forKey: historyKey),
+           let decoded = try? decoder.decode([String: [UUID]].self, from: data) {
+            iCloudHistory = decoded
+        } else {
+            iCloudHistory = [:]
+        }
+
+        // If iCloud has no data yet, push local data up (first run / migration).
+        let iCloudIsEmpty = iCloudHabits.isEmpty && iCloudDeleted.isEmpty && iCloudHistory.isEmpty
+        if iCloudIsEmpty {
+            saveToICloud()
+            lastSyncDate = Date()
+            return
+        }
+
+        // 1. Merge deleted habits (union by id; local metadata wins on conflict).
+        let mergedDeleted = unionByID(local: deletedHabits, remote: iCloudDeleted)
+        let deletedIDs = Set(mergedDeleted.map { $0.id })
+
+        // 2. Merge active habits (union by id), removing anything since deleted.
+        let mergedActive = unionByID(local: habits, remote: iCloudHabits)
+            .filter { !deletedIDs.contains($0.id) }
+
+        // 3. Merge history: timestamp-based per-date winner (newer write wins, fixing uncheck sync).
+        let iCloudTimestamps: [String: TimeInterval]
+        if let data = iCloudStore.data(forKey: historyTimestampsKey),
+           let decoded = try? decoder.decode([String: TimeInterval].self, from: data) {
+            iCloudTimestamps = decoded
+        } else {
+            iCloudTimestamps = [:]
+        }
+
+        var mergedHistory: [String: [UUID]] = [:]
+        var mergedTimestamps: [String: TimeInterval] = [:]
+        let allDates = Set(habitHistory.keys).union(iCloudHistory.keys)
+
+        for date in allDates {
+            let localTs = habitHistoryTimestamps[date]
+            let iCloudTs = iCloudTimestamps[date]
+
+            switch (localTs, iCloudTs) {
+            case (let lt?, let it?):
+                // Both modified: newer wins
+                if lt >= it {
+                    mergedHistory[date] = habitHistory[date]
+                    mergedTimestamps[date] = lt
+                } else {
+                    mergedHistory[date] = iCloudHistory[date]
+                    mergedTimestamps[date] = it
+                }
+            case (.some(let lt), nil):
+                // Only local has a timestamp: use local
+                mergedHistory[date] = habitHistory[date]
+                mergedTimestamps[date] = lt
+            case (nil, .some(let it)):
+                // Only iCloud has a timestamp: use iCloud
+                mergedHistory[date] = iCloudHistory[date]
+                mergedTimestamps[date] = it
+            case (nil, nil):
+                // No timestamps (old data before this fix): union merge as safe fallback
+                let combined = Array(Set((habitHistory[date] ?? []) + (iCloudHistory[date] ?? [])))
+                if !combined.isEmpty { mergedHistory[date] = combined }
+            }
+        }
+        // Drop dates where the winning side had no completions (e.g., fully unchecked)
+        mergedHistory = mergedHistory.compactMapValues { $0.isEmpty ? nil : $0 }
+        habitHistoryTimestamps = mergedTimestamps
+
+        habits = mergedActive
+        deletedHabits = mergedDeleted
+        habitHistory = mergedHistory
+
+        // Persist merged state locally and push back to iCloud.
+        save()
+        lastSyncDate = Date()
+        print("☁️ Merged iCloud data — \(mergedActive.count) active, \(mergedDeleted.count) deleted, \(mergedHistory.count) days")
+    }
+
+    /// Returns the union of two Habit arrays keyed by id.
+    /// Local entries take precedence when the same id appears in both.
+    private func unionByID(local: [Habit], remote: [Habit]) -> [Habit] {
+        var result = local
+        let localIDs = Set(local.map { $0.id })
+        for habit in remote where !localIDs.contains(habit.id) {
+            result.append(habit)
+        }
+        return result
+    }
+
+    /// Writes the current in-memory state to iCloud KV store.
+    private func saveToICloud() {
+        guard iCloudSyncEnabled else { return }
+        let encoder = JSONEncoder()
+        if let data = try? encoder.encode(habits) {
+            iCloudStore.set(data, forKey: habitsKey)
+        }
+        if let data = try? encoder.encode(deletedHabits) {
+            iCloudStore.set(data, forKey: deletedHabitsKey)
+        }
+        if let data = try? encoder.encode(habitHistory) {
+            iCloudStore.set(data, forKey: historyKey)
+        }
+        if let data = try? encoder.encode(habitHistoryTimestamps) {
+            iCloudStore.set(data, forKey: historyTimestampsKey)
+        }
+        iCloudStore.synchronize()
+        print("☁️ Saved to iCloud")
+    }
+
+    deinit {
+        if let observer = iCloudChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = foregroundObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 }
