@@ -9,18 +9,15 @@ import SwiftUI
 
 struct YearContributionGrid: View {
     let year: Int
-    @ObservedObject var viewModel: HabitViewModel
+    @EnvironmentObject var viewModel: HabitViewModel
     let onDateTap: (Date) -> Void
-    
-    private let calendar = Calendar.current
-    
+
     var body: some View {
-        LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: 8), count: 3), spacing: 8) {
+        LazyVGrid(columns: Array(repeating: .init(.flexible(), spacing: HabitTheme.Spacing.sm), count: 3), spacing: HabitTheme.Spacing.sm) {
             ForEach(1...12, id: \.self) { month in
                 MonthBlockView(
                     year: year,
                     month: month,
-                    viewModel: viewModel,
                     onDateTap: onDateTap
                 )
             }
@@ -33,23 +30,23 @@ struct YearContributionGrid: View {
 struct MonthBlockView: View {
     let year: Int
     let month: Int
-    @ObservedObject var viewModel: HabitViewModel
+    @EnvironmentObject var viewModel: HabitViewModel
     let onDateTap: (Date) -> Void
-    
+
+    @Environment(\.colorScheme) private var colorScheme
     private let calendar = Calendar.current
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: HabitTheme.Spacing.xs) {
             // Month header
             HStack {
                 Text(monthName)
-                    .font(.headline)
-                    .fontWeight(.semibold)
+                    .font(HabitTheme.Typography.captionMedium)
 
                 Spacer()
 
                 Text("\(completedDays)/\(totalDays)")
-                    .font(.caption)
+                    .font(HabitTheme.Typography.caption2)
                     .foregroundColor(.secondary)
             }
 
@@ -69,89 +66,73 @@ struct MonthBlockView: View {
                 }
             }
         }
-        .padding(8)
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
+        .padding(HabitTheme.Spacing.sm)
+        .background(HabitTheme.Colors.cardBackground)
+        .cornerRadius(HabitTheme.Layout.cornerRadiusSmall)
+        .overlay(
+            RoundedRectangle(cornerRadius: HabitTheme.Layout.cornerRadiusSmall)
+                .stroke(Color(.separator).opacity(0.15), lineWidth: 0.5)
+        )
     }
-    
+
     private var monthName: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM"
-        
-        // Create date components for the first day of the month in local timezone
         var dateComponents = DateComponents()
         dateComponents.year = year
         dateComponents.month = month
         dateComponents.day = 1
-        dateComponents.hour = 12 // Set to noon to avoid timezone issues
-        dateComponents.minute = 0
-        dateComponents.second = 0
-        
+        dateComponents.hour = 12
         let date = calendar.date(from: dateComponents) ?? Date()
         return formatter.string(from: date)
     }
-    
+
     private var totalDays: Int {
-        // Create date components for the first day of the month in local timezone
         var dateComponents = DateComponents()
         dateComponents.year = year
         dateComponents.month = month
         dateComponents.day = 1
-        dateComponents.hour = 12 // Set to noon to avoid timezone issues
-        dateComponents.minute = 0
-        dateComponents.second = 0
-        
+        dateComponents.hour = 12
         guard let firstOfMonth = calendar.date(from: dateComponents),
               let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else {
             return 0
         }
         return range.count
     }
-    
+
     private var completedDays: Int {
-        // Create date components for the first day of the month in local timezone
         var dateComponents = DateComponents()
         dateComponents.year = year
         dateComponents.month = month
         dateComponents.day = 1
-        dateComponents.hour = 12 // Set to noon to avoid timezone issues
-        dateComponents.minute = 0
-        dateComponents.second = 0
-        
-        guard let startOfMonth = calendar.date(from: dateComponents),
-              let _ = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) else {
-            return 0
-        }
-        
+        dateComponents.hour = 12
+        guard let startOfMonth = calendar.date(from: dateComponents) else { return 0 }
+
         var completedCount = 0
         var currentDate = startOfMonth
-        
-        while currentDate <= calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) ?? currentDate {
-            let completionCount = getCompletionCount(for: currentDate)
-            if completionCount > 0 {
+        let endDate = calendar.date(from: DateComponents(year: year, month: month + 1, day: 0)) ?? currentDate
+
+        while currentDate <= endDate {
+            if getCompletionCount(for: currentDate) > 0 {
                 completedCount += 1
             }
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
         }
-        
+
         return completedCount
     }
-    
+
     private var monthDays: [(date: Date, completionCount: Int, isCurrentMonth: Bool)] {
-        // Create date components for the first day of the month in local timezone
         var dateComponents = DateComponents()
         dateComponents.year = year
         dateComponents.month = month
         dateComponents.day = 1
-        dateComponents.hour = 12 // Set to noon to avoid timezone issues
-        dateComponents.minute = 0
-        dateComponents.second = 0
+        dateComponents.hour = 12
 
         guard let startOfMonth = calendar.date(from: dateComponents) else {
             return []
         }
 
-        // Find the Sunday of the week containing startOfMonth
         let weekday = calendar.component(.weekday, from: startOfMonth)
         let daysToSubtract = (weekday - 1) % 7
         let gridStartDate = calendar.date(byAdding: .day, value: -daysToSubtract, to: startOfMonth) ?? startOfMonth
@@ -159,24 +140,21 @@ struct MonthBlockView: View {
         var dates: [Date] = []
         var currentDate = gridStartDate
 
-        // Generate 6 weeks worth of dates (42 days) to fill the calendar grid
         for _ in 0..<42 {
             dates.append(currentDate)
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
         }
 
         return dates.map { date in
-            let completionCount = getCompletionCount(for: date)
-            let isCurrentMonth = calendar.component(.month, from: date) == month
-            return (date: date, completionCount: completionCount, isCurrentMonth: isCurrentMonth)
+            (date: date,
+             completionCount: getCompletionCount(for: date),
+             isCurrentMonth: calendar.component(.month, from: date) == month)
         }
     }
-    
+
     private func getCompletionCount(for date: Date) -> Int {
         let dateKey = viewModel.dateKey(date)
         let completedHabits = viewModel.habitHistory[dateKey] ?? []
-        
-        // Filter out habits that no longer exist
         return completedHabits.filter { habitId in
             viewModel.habits.contains { $0.id == habitId }
         }.count
@@ -193,44 +171,39 @@ struct MonthContributionCell: View {
     let isCurrentMonth: Bool
     let onTap: () -> Void
 
-    private let calendar = Calendar.current
-    @Environment(\.colorScheme) var colorScheme
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: onTap) {
             Rectangle()
                 .fill(backgroundColor)
-                .frame(width: 12, height: 12)
+                .frame(width: HabitTheme.Layout.contributionCellSizeSmall, height: HabitTheme.Layout.contributionCellSizeSmall)
                 .overlay(
                     Rectangle()
-                        .stroke(isToday && isCurrentMonth ? Color.blue : Color.clear, lineWidth: 1)
+                        .stroke(isToday && isCurrentMonth ? HabitTheme.Colors.brand : Color.clear, lineWidth: 1)
                 )
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityHint("Double tap to view details")
     }
 
     private var backgroundColor: Color {
-        // Days from other months use same color as zero completion
         if !isCurrentMonth {
-            return Color(.systemGray5)
+            return colorScheme == .dark ? Color(white: 0.12) : Color(.systemGray6)
         }
 
-        if totalHabits == 0 || completionCount == 0 {
-            return Color(.systemGray5)
-        }
+        let level = HabitTheme.Colors.contributionLevel(completed: completionCount, total: totalHabits)
+        return HabitTheme.Colors.contributionColor(level: level, scheme: colorScheme)
+    }
 
-        let percentage = Double(completionCount) / Double(totalHabits)
-
-        if percentage <= 0.2 {
-            return Color.green.opacity(0.3)
-        } else if percentage <= 0.4 {
-            return Color.green.opacity(0.5)
-        } else if percentage <= 0.6 {
-            return Color.green.opacity(0.7)
-        } else if percentage <= 0.8 {
-            return Color.green.opacity(0.85)
-        } else {
-            return Color.green
-        }
+    private var accessibilityDescription: String {
+        guard isCurrentMonth else { return "Outside current month" }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        let dateStr = formatter.string(from: date)
+        if totalHabits == 0 { return "\(dateStr), no habits tracked" }
+        let pct = Int(Double(completionCount) / Double(totalHabits) * 100)
+        return "\(dateStr), \(pct) percent"
     }
 }

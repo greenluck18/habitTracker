@@ -1,257 +1,269 @@
 import SwiftUI
 
 struct HabitListView: View {
-    @StateObject private var viewModel = HabitViewModel();
-    @State private var showingDeleteHabit = false
+    @EnvironmentObject var viewModel: HabitViewModel
     @State private var showingAddHabit = false
-    @State private var showingEditHabit = false
-    @State private var showingHistory = false
+    @State private var showingEditHabits = false
     @State private var showingDeveloperMode = false
     @State private var titleTapCount = 0
     @State private var tapResetTimer: Timer?
     @State private var currentDate = Date()
     @State private var dayChangeTimer: Timer?
-    
-    private let dateFormatter = DateFormatter()
-    
-    init() {
-        dateFormatter.dateFormat = "EEEE, MMM d, yyyy"
-    }
+
+    private let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d"
+        return f
+    }()
 
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Header with current date and progress - only show when there are habits
-                if !viewModel.habits.isEmpty {
-                    VStack(spacing: 8) {
-                        Text(dateFormatter.string(from: currentDate))
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                        
-                        let todayProgress = viewModel.getTodayProgress()
-                        VStack(spacing: 8) {
-                            HStack {
-                                Text("\(todayProgress.completed)/\(todayProgress.total) habits completed today")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                                
-                                Spacer()
-                                
-                                Text("\(Int((Double(todayProgress.completed) / Double(todayProgress.total)) * 100))%")
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.green)
-                            }
-                            
-                            ProgressView(value: Double(todayProgress.completed), total: Double(todayProgress.total))
-                                .progressViewStyle(LinearProgressViewStyle(tint: .green))
-                                .frame(height: 8)
-                                .scaleEffect(x: 1, y: 1.5, anchor: .center) // Make it slightly thicker
-                        }
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: HabitTheme.Spacing.xl) {
+                    if viewModel.habits.isEmpty {
+                        emptyState
+                    } else {
+                        progressHeader
+                        habitCards
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
                 }
-                
-                // Habits list
-                if viewModel.habits.isEmpty {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        Image(systemName: "target")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No habits yet")
-                            .font(.title2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                        Text("Tap the + button to add your first habit")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        Spacer()
-                    }
-                    .padding()
-                } else {
-                    List {
-                        ForEach(viewModel.habits) { habit in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(habit.name)
-                                        .font(.body)
-                                        .foregroundColor(viewModel.isCompleted(habit) ? .green : .primary)
-                                    
-                                    // Show streak count
-                                    let streak = viewModel.getStreakCount(for: habit)
-                                    if streak > 0 {
-                                        Text("🔥 \(streak) day streak")
-                                            .font(.caption)
-                                            .foregroundColor(.orange)
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                Button(action: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        viewModel.toggleHabitCompletion(habit)
-                                    }
-                                }) {
-                                    Image(systemName: viewModel.isCompleted(habit) ? "checkmark.square.fill" : "square")
-                                        .font(.title2)
-                                        .foregroundColor(viewModel.isCompleted(habit) ? .green : .gray)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .listStyle(PlainListStyle())
-                }
-                
-                // Progress view button
-                NavigationLink(destination: HabitGridView().environmentObject(viewModel)) {
-                    HStack {
-                        Image(systemName: "chart.bar.fill")
-                        Text("View Progress")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                }
-                .padding()
+                .padding(.horizontal, HabitTheme.Spacing.lg)
+                .padding(.vertical, HabitTheme.Spacing.lg)
             }
+            .background(HabitTheme.Colors.surface.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Button(action: {
-                        handleTitleTap()
-                    }) {
+                    Button(action: handleTitleTap) {
                         Text("My Habits")
-                            .font(.headline)
+                            .font(HabitTheme.Typography.headline)
                             .foregroundColor(.primary)
                     }
                 }
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        showingHistory = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock.arrow.circlepath")
-                            if !viewModel.deletedHabits.isEmpty {
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 8, height: 8)
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: HabitTheme.Spacing.sm) {
+                        if !viewModel.habits.isEmpty {
+                            Button { showingEditHabits = true } label: {
+                                Image(systemName: "pencil")
+                                    .font(.body)
                             }
                         }
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingAddHabit = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        showingEditHabit = true
-                    } label: {
-                        Image(systemName: "pencil")
+                        Button { showingAddHabit = true } label: {
+                            Image(systemName: "plus")
+                                .font(.body.weight(.semibold))
+                        }
                     }
                 }
             }
             .sheet(isPresented: $showingAddHabit) {
-                AddHabitView(viewModel: viewModel)
+                AddHabitView()
             }
-            .sheet(isPresented: $showingEditHabit) {
-                EditHabitsView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingHistory) {
-                DeletedHabitHistoryView(viewModel: viewModel)
+            .sheet(isPresented: $showingEditHabits) {
+                EditHabitsView()
             }
             .alert("Developer Mode", isPresented: $showingDeveloperMode) {
-                Button("Add Mocks") {
-                    viewModel.addMocksForCurrentYear()
-                }
-                Button("Delete Mocks", role: .destructive) {
-                    viewModel.deleteAllMocks()
-                }
+                Button("Add Mocks") { viewModel.addMocksForCurrentYear() }
+                Button("Delete Mocks", role: .destructive) { viewModel.deleteAllMocks() }
                 Button("Cancel", role: .cancel) { }
             } message: {
                 Text("Do you want to add or delete mock data?")
             }
         }
-        .onAppear {
-            startDayChangeTimer()
+        .onAppear { startDayChangeTimer() }
+        .onDisappear { stopDayChangeTimer() }
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: HabitTheme.Spacing.xl) {
+            Spacer(minLength: 60)
+
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(HabitTheme.Colors.brand.opacity(0.6))
+                .padding(.bottom, HabitTheme.Spacing.sm)
+
+            VStack(spacing: HabitTheme.Spacing.sm) {
+                Text("Build Better Habits")
+                    .font(HabitTheme.Typography.title)
+                    .foregroundColor(.primary)
+
+                Text("Track your daily routines and\nwatch your progress grow.")
+                    .font(HabitTheme.Typography.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                showingAddHabit = true
+            } label: {
+                Label("Add Your First Habit", systemImage: "plus")
+                    .font(HabitTheme.Typography.bodyMedium)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: 240)
+                    .padding(.vertical, HabitTheme.Spacing.md)
+                    .background(HabitTheme.Colors.brand)
+                    .cornerRadius(HabitTheme.Layout.cornerRadius)
+            }
+            .padding(.top, HabitTheme.Spacing.sm)
+
+            Spacer(minLength: 60)
         }
-        .onDisappear {
-            stopDayChangeTimer()
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No habits yet. Tap Add Your First Habit to get started.")
+    }
+
+    // MARK: - Progress Header
+
+    private var progressHeader: some View {
+        let todayProgress = viewModel.getTodayProgress()
+        let progress = todayProgress.total > 0
+            ? Double(todayProgress.completed) / Double(todayProgress.total)
+            : 0
+
+        return VStack(spacing: HabitTheme.Spacing.lg) {
+            VStack(spacing: HabitTheme.Spacing.xs) {
+                Text(HabitTheme.greeting)
+                    .font(HabitTheme.Typography.title)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(dateFormatter.string(from: currentDate))
+                    .font(HabitTheme.Typography.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: HabitTheme.Spacing.xxl) {
+                ProgressRing(progress: progress, size: 96, lineWidth: 10)
+
+                VStack(alignment: .leading, spacing: HabitTheme.Spacing.sm) {
+                    Text("\(todayProgress.completed) of \(todayProgress.total)")
+                        .font(HabitTheme.Typography.title3)
+                        .foregroundColor(.primary)
+
+                    Text("habits completed")
+                        .font(HabitTheme.Typography.subheadline)
+                        .foregroundColor(.secondary)
+
+                    Text(HabitTheme.motivationalText(
+                        completed: todayProgress.completed,
+                        total: todayProgress.total
+                    ))
+                    .font(HabitTheme.Typography.caption)
+                    .foregroundColor(HabitTheme.Colors.brand)
+                    .padding(.top, HabitTheme.Spacing.xs)
+                }
+
+                Spacer()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(todayProgress.completed) of \(todayProgress.total) habits completed today, \(Int(progress * 100)) percent")
+        }
+        .padding(HabitTheme.Spacing.xl)
+        .cardStyle()
+    }
+
+    // MARK: - Habit Cards
+
+    private var habitCards: some View {
+        VStack(spacing: HabitTheme.Spacing.md) {
+            ForEach(viewModel.habits) { habit in
+                let isCompleted = viewModel.isCompleted(habit)
+                let streak = viewModel.getStreakCount(for: habit)
+
+                Button {
+                    let wasCompleted = isCompleted
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                        viewModel.toggleHabitCompletion(habit)
+                    }
+                    if !wasCompleted {
+                        HabitTheme.Haptics.toggle()
+                        let updated = viewModel.getTodayProgress()
+                        if updated.completed == updated.total {
+                            HabitTheme.Haptics.success()
+                        }
+                    } else {
+                        HabitTheme.Haptics.selection()
+                    }
+                } label: {
+                    HStack(spacing: HabitTheme.Spacing.md) {
+                        Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                            .font(.title2)
+                            .foregroundColor(isCompleted ? HabitTheme.Colors.success : Color(.tertiaryLabel))
+                            .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+                            .contentTransition(.symbolEffect(.replace))
+
+                        Text(habit.name)
+                            .font(HabitTheme.Typography.bodyMedium)
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if streak > 0 {
+                            HStack(spacing: 4) {
+                                Image(systemName: "flame.fill")
+                                    .font(.caption)
+                                    .foregroundColor(HabitTheme.Colors.streak)
+                                Text("\(streak)")
+                                    .font(HabitTheme.Typography.captionMedium)
+                                    .foregroundColor(HabitTheme.Colors.streak)
+                            }
+                            .padding(.horizontal, HabitTheme.Spacing.sm)
+                            .padding(.vertical, HabitTheme.Spacing.xs)
+                            .background(HabitTheme.Colors.streakSoft)
+                            .cornerRadius(HabitTheme.Layout.cornerRadiusTiny)
+                        }
+                    }
+                    .padding(HabitTheme.Spacing.lg)
+                    .cardStyle(isHighlighted: isCompleted)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(habit.name), \(isCompleted ? "completed" : "not completed")\(streak > 0 ? ", \(streak) day streak" : "")")
+                .accessibilityHint(isCompleted ? "Double tap to mark as not completed" : "Double tap to mark as completed")
+            }
         }
     }
 
+    // MARK: - Timer & Dev Mode
+
     private func handleTitleTap() {
         titleTapCount += 1
-
-        // Cancel existing timer
         tapResetTimer?.invalidate()
-
-        // Check if reached 7 taps
         if titleTapCount == 7 {
             showingDeveloperMode = true
             titleTapCount = 0
         } else {
-            // Reset counter after 2 seconds of inactivity
             tapResetTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { _ in
                 titleTapCount = 0
             }
         }
     }
-    
+
     private func startDayChangeTimer() {
-        // Stop any existing timer
         stopDayChangeTimer()
-        
-        // Calculate time until next midnight
         let calendar = Calendar.current
         let now = Date()
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
         let nextMidnight = calendar.startOfDay(for: tomorrow)
         let timeUntilMidnight = nextMidnight.timeIntervalSince(now)
-        
-        // Set timer to fire at midnight
+
         dayChangeTimer = Timer.scheduledTimer(withTimeInterval: timeUntilMidnight, repeats: false) { _ in
-            // Day has changed, update the current date
             currentDate = Date()
-            
-            // Debug: Print when day changes
-            print("🔄 Day changed! New date: \(currentDate)")
-            
-            // Refresh the view model to update all data
             viewModel.refreshForNewDay()
-            
-            // Restart the timer for the next day
             startDayChangeTimer()
         }
-        
-        // Also set up a timer that checks every minute to catch any edge cases
+
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             let now = Date()
-            let calendar = Calendar.current
-            
-            // Check if the day has changed
             if !calendar.isDate(currentDate, inSameDayAs: now) {
                 currentDate = now
-                // Debug: Print when day changes via fallback timer
-                print("🔄 Day changed via fallback timer! New date: \(currentDate)")
-                // Refresh the view model to update all data
                 viewModel.refreshForNewDay()
             }
         }
     }
-    
+
     private func stopDayChangeTimer() {
         dayChangeTimer?.invalidate()
         dayChangeTimer = nil

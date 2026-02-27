@@ -8,132 +8,162 @@
 import SwiftUI
 
 struct DeletedHabitHistoryView: View {
-    @ObservedObject var viewModel: HabitViewModel
+    @EnvironmentObject var viewModel: HabitViewModel
     @State private var expandedHabits: Set<UUID> = []
-    
-    private let dateFormatter = DateFormatter()
-    
-    init(viewModel: HabitViewModel) {
-        self.viewModel = viewModel
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
-    }
-    
+
+    private let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        return f
+    }()
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
+        NavigationStack {
+            Group {
                 if viewModel.deletedHabits.isEmpty {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        Image(systemName: "trash")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                        Text("No deleted habits")
-                            .font(.title2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.primary)
-                        Text("Deleted habits and their completion history will appear here")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                        Spacer()
-                    }
-                    .padding()
+                    emptyState
                 } else {
-                    List {
-                        ForEach(viewModel.getDeletedHabitsWithHistory()) { habit in
-                            VStack(alignment: .leading, spacing: 12) {
-                                // Habit header
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(habit.name)
-                                            .font(.headline)
-                                            .foregroundColor(.primary)
-                                        
-                                        if let deletedAt = habit.deletedAt {
-                                            Text("Deleted on \(dateFormatter.string(from: deletedAt))")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        Text("\(habit.completionHistory.count) completions")
-                                            .font(.caption)
-                                            .foregroundColor(.blue)
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            if expandedHabits.contains(habit.id) {
-                                                expandedHabits.remove(habit.id)
-                                            } else {
-                                                expandedHabits.insert(habit.id)
-                                            }
-                                        }
-                                    }) {
-                                        Image(systemName: expandedHabits.contains(habit.id) ? "chevron.up" : "chevron.down")
-                                            .font(.caption)
-                                            .foregroundColor(.blue)
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
-                                
-                                // Completion history (expandable)
-                                if expandedHabits.contains(habit.id) {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Divider()
-                                        
-                                        if habit.completionHistory.isEmpty {
-                                            Text("No completion history")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                                .italic()
-                                        } else {
-                                            Text("Completion History:")
-                                                .font(.subheadline)
-                                                .fontWeight(.semibold)
-                                                .foregroundColor(.primary)
-                                            
-                                            LazyVStack(alignment: .leading, spacing: 4) {
-                                                ForEach(viewModel.getCompletionHistoryForDeletedHabit(habit), id: \.self) { dateString in
-                                                    HStack {
-                                                        Image(systemName: "checkmark.circle.fill")
-                                                            .font(.caption)
-                                                            .foregroundColor(.green)
-                                                        
-                                                        Text(viewModel.formatCompletionDate(dateString))
-                                                            .font(.caption)
-                                                            .foregroundColor(.primary)
-                                                        
-                                                        Spacer()
-                                                    }
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 2)
-                                                    .background(Color.green.opacity(0.1))
-                                                    .cornerRadius(6)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                                }
-                            }
-                            .padding(.vertical, 8)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                        }
-                    }
-                    .listStyle(PlainListStyle())
+                    habitList
                 }
             }
-            .navigationTitle("Habit History")
+            .background(HabitTheme.Colors.surface.ignoresSafeArea())
+            .navigationTitle("Archive")
             .navigationBarTitleDisplayMode(.large)
         }
     }
-}
 
-#Preview {
-    DeletedHabitHistoryView(viewModel: HabitViewModel())
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: HabitTheme.Spacing.lg) {
+            Spacer()
+
+            Image(systemName: "archivebox")
+                .font(.system(size: 56))
+                .foregroundColor(.secondary.opacity(0.6))
+
+            VStack(spacing: HabitTheme.Spacing.sm) {
+                Text("No archived habits")
+                    .font(HabitTheme.Typography.title)
+                    .foregroundColor(.primary)
+
+                Text("Deleted habits and their completion\nhistory will appear here.")
+                    .font(HabitTheme.Typography.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Spacer()
+        }
+        .padding(HabitTheme.Spacing.lg)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No archived habits. Deleted habits will appear here.")
+    }
+
+    // MARK: - Habit List
+
+    private var habitList: some View {
+        ScrollView {
+            LazyVStack(spacing: HabitTheme.Spacing.md) {
+                ForEach(viewModel.getDeletedHabitsWithHistory()) { habit in
+                    habitCard(habit)
+                }
+            }
+            .padding(HabitTheme.Spacing.lg)
+        }
+    }
+
+    // MARK: - Habit Card
+
+    private func habitCard(_ habit: Habit) -> some View {
+        VStack(alignment: .leading, spacing: HabitTheme.Spacing.md) {
+            // Header
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    if expandedHabits.contains(habit.id) {
+                        expandedHabits.remove(habit.id)
+                    } else {
+                        expandedHabits.insert(habit.id)
+                    }
+                }
+                HabitTheme.Haptics.selection()
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: HabitTheme.Spacing.xs) {
+                        Text(habit.name)
+                            .font(HabitTheme.Typography.headline)
+                            .foregroundColor(.primary)
+
+                        if let deletedAt = habit.deletedAt {
+                            Text("Deleted \(dateFormatter.string(from: deletedAt))")
+                                .font(HabitTheme.Typography.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack(spacing: HabitTheme.Spacing.xs) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.caption2)
+                            Text("\(habit.completionHistory.count) completions")
+                                .font(HabitTheme.Typography.caption)
+                        }
+                        .foregroundColor(HabitTheme.Colors.brand)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: expandedHabits.contains(habit.id) ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(habit.name), \(habit.completionHistory.count) completions")
+            .accessibilityHint(expandedHabits.contains(habit.id) ? "Double tap to collapse" : "Double tap to expand history")
+
+            // Expanded completion history
+            if expandedHabits.contains(habit.id) {
+                VStack(alignment: .leading, spacing: HabitTheme.Spacing.sm) {
+                    Divider()
+                        .padding(.vertical, HabitTheme.Spacing.xs)
+
+                    if habit.completionHistory.isEmpty {
+                        Text("No completion history")
+                            .font(HabitTheme.Typography.caption)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    } else {
+                        Text("Completion History")
+                            .font(HabitTheme.Typography.subheadlineMedium)
+                            .foregroundColor(.primary)
+
+                        LazyVStack(alignment: .leading, spacing: HabitTheme.Spacing.xs) {
+                            ForEach(viewModel.getCompletionHistoryForDeletedHabit(habit), id: \.self) { dateString in
+                                HStack(spacing: HabitTheme.Spacing.sm) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(HabitTheme.Colors.success)
+
+                                    Text(viewModel.formatCompletionDate(dateString))
+                                        .font(HabitTheme.Typography.caption)
+                                        .foregroundColor(.primary)
+
+                                    Spacer()
+                                }
+                                .padding(.horizontal, HabitTheme.Spacing.sm)
+                                .padding(.vertical, HabitTheme.Spacing.xs)
+                                .background(HabitTheme.Colors.successSoft)
+                                .cornerRadius(HabitTheme.Layout.cornerRadiusTiny)
+                            }
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(HabitTheme.Spacing.lg)
+        .cardStyle()
+    }
 }

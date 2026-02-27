@@ -15,334 +15,246 @@ struct IdentifiableDate: Identifiable {
 
 struct HabitGridView: View {
     @EnvironmentObject var viewModel: HabitViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedDate: IdentifiableDate?
     @State private var selectedYear = Calendar.current.component(.year, from: Date())
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var showingYearSelector = false
-    @State private var viewMode: ViewMode = .month // Default to month view
+    @State private var viewMode: ViewMode = .month
     @State private var currentDate = Date()
     @State private var dayChangeTimer: Timer?
 
-    enum ViewMode {
-        case month
-        case year
+    enum ViewMode: String, CaseIterable {
+        case month = "Month"
+        case year = "Year"
     }
-    
+
     private let calendar = Calendar.current
-    private let dateFormatter = DateFormatter()
-    
-    init() {
-        dateFormatter.dateFormat = "MMM d, yyyy"
-    }
-    
+
     private var monthYearString: String {
         let monthFormatter = DateFormatter()
         monthFormatter.dateFormat = "MMMM yyyy"
         let date = calendar.date(from: DateComponents(year: selectedYear, month: selectedMonth)) ?? Date()
         return monthFormatter.string(from: date)
     }
-    
-    private func monthName(for month: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        let date = calendar.date(from: DateComponents(year: selectedYear, month: month)) ?? Date()
-        return formatter.string(from: date)
-    }
 
     var body: some View {
-        VStack(spacing: 16) {
-            // Current date and stats header
-            VStack(spacing: 8) {
-                Text("Today: \(dateFormatter.string(from: currentDate))")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                
-                let todayCompletedHabits = viewModel.habitHistory[dateKey(Date())] ?? []
-                let totalHabits = viewModel.habits.count
-                
-                // Filter out habits that no longer exist in the active habits list
-                let validTodayCompleted = todayCompletedHabits.filter { habitId in
-                    viewModel.habits.contains { $0.id == habitId }
-                }
-                
-                Text("\(validTodayCompleted.count)/\(totalHabits) habits completed today")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                if totalHabits > 0 {
-                    ProgressView(value: Double(validTodayCompleted.count), total: Double(totalHabits))
-                        .progressViewStyle(LinearProgressViewStyle(tint: .green))
-                        .frame(height: 8)
-                }
-            }
-            .padding(.horizontal)
-            
-            // View mode toggle and date selector
-            VStack(spacing: 12) {
-                // View mode toggle
-                HStack {
-                    Spacer()
-                    
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Controls section
+                VStack(spacing: HabitTheme.Spacing.md) {
+                    // View mode toggle
                     Picker("View Mode", selection: $viewMode) {
-                        Text("Month").tag(ViewMode.month)
-                        Text("Year").tag(ViewMode.year)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .frame(width: 200)
-                    
-                    Spacer()
-                }
-                
-                // Date selector based on view mode
-                if viewMode == .month {
-                    // Month view controls
-                    HStack {
-                        Button(action: {
-                            if selectedMonth > 1 {
-                                selectedMonth -= 1
-                            } else {
-                                selectedMonth = 12
-                                selectedYear -= 1
-                            }
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .font(.title3)
-                                .foregroundColor(.blue)
-                        }
-                        
-                        Spacer()
-                        
-                        Text(monthYearString)
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            if selectedMonth < 12 {
-                                selectedMonth += 1
-                            } else {
-                                selectedMonth = 1
-                                selectedYear += 1
-                            }
-                        }) {
-                            Image(systemName: "chevron.right")
-                                .font(.title3)
-                                .foregroundColor(.blue)
+                        ForEach(ViewMode.allCases, id: \.self) { mode in
+                            Text(mode.rawValue).tag(mode)
                         }
                     }
-                } else {
-                    // Year view controls
-                    HStack {
-                        Button(action: {
-                            showingYearSelector = true
-                        }) {
-                            HStack(spacing: 4) {
-                                Text(String(selectedYear))
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .kerning(0)
-                                Image(systemName: "chevron.down")
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.blue)
-                        }
-                        
-                        Spacer()
-                        
-                        // Year navigation buttons
-                        HStack(spacing: 12) {
-                            Button(action: {
-                                selectedYear -= 1
-                            }) {
-                                Image(systemName: "chevron.left")
-                                    .font(.title3)
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            Button(action: {
-                                selectedYear += 1
-                            }) {
-                                Image(systemName: "chevron.right")
-                                    .font(.title3)
-                                    .foregroundColor(.blue)
-                            }
-                        }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, HabitTheme.Spacing.lg)
+
+                    // Date navigation
+                    if viewMode == .month {
+                        monthNavigation
+                    } else {
+                        yearNavigation
                     }
                 }
-            }
-            .padding(.horizontal)
-            
-            // Content based on view mode
-            ScrollView {
-                if viewMode == .month {
-                    // Month view - daily calendar grid
-                    MonthCalendarView(
-                        year: selectedYear,
-                        month: selectedMonth,
-                        viewModel: viewModel,
-                        onDateTap: { date in
-                            selectedDate = IdentifiableDate(date: date)
-                        }
-                    )
-                    .padding()
-                } else {
-                    // Year view - unified contribution grid
-                    YearContributionGrid(
-                        year: selectedYear,
-                        viewModel: viewModel,
-                        onDateTap: { date in
-                            selectedDate = IdentifiableDate(date: date)
-                        }
-                    )
-                    .padding()
-                }
-            }
-            
-            // Legend
-            HStack {
-                Text("Less")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 2) {
-                    ForEach(0..<6) { level in
-                        Rectangle()
-                            .fill(contributionColor(for: level, totalHabits: viewModel.habits.count))
-                            .frame(width: 12, height: 12)
-                            .cornerRadius(2)
+                .padding(.vertical, HabitTheme.Spacing.md)
+
+                // Content
+                ScrollView {
+                    if viewMode == .month {
+                        MonthCalendarView(
+                            year: selectedYear,
+                            month: selectedMonth,
+                            onDateTap: { date in
+                                selectedDate = IdentifiableDate(date: date)
+                                HabitTheme.Haptics.selection()
+                            }
+                        )
+                        .padding(.horizontal, HabitTheme.Spacing.lg)
+                    } else {
+                        YearContributionGrid(
+                            year: selectedYear,
+                            onDateTap: { date in
+                                selectedDate = IdentifiableDate(date: date)
+                                HabitTheme.Haptics.selection()
+                            }
+                        )
+                        .padding(.horizontal, HabitTheme.Spacing.lg)
                     }
                 }
-                
-                Text("More")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+
+                // Legend
+                legend
             }
-            .padding(.horizontal)
-        }
-        .navigationTitle("Progress")
-        .sheet(item: $selectedDate) { identifiableDate in
-            DateDetailView(
-                date: identifiableDate.date,
-                viewModel: viewModel
-            )
-        }
-        .sheet(isPresented: $showingYearSelector) {
-            YearSelectorView(selectedYear: $selectedYear, isPresented: $showingYearSelector)
-        }
-        .onAppear {
-            startDayChangeTimer()
-        }
-        .onDisappear {
-            stopDayChangeTimer()
+            .background(HabitTheme.Colors.surface.ignoresSafeArea())
+            .navigationTitle("Progress")
+            .navigationBarTitleDisplayMode(.large)
+            .sheet(item: $selectedDate) { identifiableDate in
+                DateDetailView(date: identifiableDate.date)
+            }
+            .sheet(isPresented: $showingYearSelector) {
+                YearSelectorView(selectedYear: $selectedYear, isPresented: $showingYearSelector)
+            }
+            .onAppear { startDayChangeTimer() }
+            .onDisappear { stopDayChangeTimer() }
         }
     }
-    
-    private func generateContributionDatesForYear(_ year: Int) -> [Date] {
-        // Create start and end dates for the year
-        let startOfYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1)) ?? Date()
-        let endOfYear = calendar.date(from: DateComponents(year: year, month: 12, day: 31)) ?? Date()
-        
-        // Find the Sunday of the week containing startOfYear
-        let weekday = calendar.component(.weekday, from: startOfYear)
-        let daysToSubtract = (weekday - 1) % 7
-        let gridStartDate = calendar.date(byAdding: .day, value: -daysToSubtract, to: startOfYear) ?? startOfYear
-        
-        var dates: [Date] = []
-        var currentDate = gridStartDate
-        
-        // Generate dates for the entire year grid (including partial weeks)
-        while currentDate <= endOfYear {
-            dates.append(currentDate)
-            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
+
+    // MARK: - Month Navigation
+
+    private var monthNavigation: some View {
+        HStack {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if selectedMonth > 1 {
+                        selectedMonth -= 1
+                    } else {
+                        selectedMonth = 12
+                        selectedYear -= 1
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(HabitTheme.Colors.brand)
+                    .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+            }
+            .accessibilityLabel("Previous month")
+
+            Spacer()
+
+            Text(monthYearString)
+                .font(HabitTheme.Typography.title)
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if selectedMonth < 12 {
+                        selectedMonth += 1
+                    } else {
+                        selectedMonth = 1
+                        selectedYear += 1
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(HabitTheme.Colors.brand)
+                    .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+            }
+            .accessibilityLabel("Next month")
         }
-        
-        return dates
+        .padding(.horizontal, HabitTheme.Spacing.lg)
     }
-    
-    private func monthLabelsForYear(_ year: Int) -> [String] {
-        let monthFormatter = DateFormatter()
-        monthFormatter.dateFormat = "MMM"
-        
-        var labels: [String] = []
-        for month in 1...12 {
-            if let monthDate = calendar.date(from: DateComponents(year: year, month: month, day: 1)) {
-                labels.append(monthFormatter.string(from: monthDate))
+
+    // MARK: - Year Navigation
+
+    private var yearNavigation: some View {
+        HStack {
+            Button {
+                showingYearSelector = true
+            } label: {
+                HStack(spacing: 4) {
+                    Text(String(selectedYear))
+                        .font(HabitTheme.Typography.title)
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundColor(HabitTheme.Colors.brand)
+            }
+            .accessibilityLabel("Select year, currently \(selectedYear)")
+
+            Spacer()
+
+            HStack(spacing: HabitTheme.Spacing.md) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedYear -= 1
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(HabitTheme.Colors.brand)
+                        .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+                }
+                .accessibilityLabel("Previous year")
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedYear += 1
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(HabitTheme.Colors.brand)
+                        .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+                }
+                .accessibilityLabel("Next year")
             }
         }
-        
-        return labels
+        .padding(.horizontal, HabitTheme.Spacing.lg)
     }
-    
-    private func dayLabel(for dayIndex: Int) -> String {
-        let days = ["S", "M", "T", "W", "T", "F", "S"]
-        return days[dayIndex]
-    }
-    
-    private func contributionColor(for level: Int, totalHabits: Int) -> Color {
-        if totalHabits == 0 {
-            return Color.gray.opacity(0.1)
+
+    // MARK: - Legend
+
+    private var legend: some View {
+        HStack(spacing: HabitTheme.Spacing.sm) {
+            Text("Less")
+                .font(HabitTheme.Typography.caption)
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 3) {
+                ForEach(0..<6) { level in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(HabitTheme.Colors.contributionColor(level: level, scheme: colorScheme))
+                        .frame(width: 14, height: 14)
+                }
+            }
+
+            Text("More")
+                .font(HabitTheme.Typography.caption)
+                .foregroundColor(.secondary)
         }
-        
-        // GitHub-style color progression
-        switch level {
-        case 0:
-            return Color.gray.opacity(0.1) // No habits completed
-        case 1:
-            return Color(red: 0.9, green: 0.95, blue: 0.9) // Very light green (1 habit)
-        case 2:
-            return Color(red: 0.6, green: 0.9, blue: 0.6) // Light green (2 habits)
-        case 3:
-            return Color(red: 0.3, green: 0.8, blue: 0.3) // Medium green (3 habits)
-        case 4:
-            return Color(red: 0.1, green: 0.7, blue: 0.1) // Dark green (4+ habits)
-        default:
-            return Color(red: 0.0, green: 0.6, blue: 0.0) // Super dark green (5+ habits)
-        }
+        .padding(.horizontal, HabitTheme.Spacing.lg)
+        .padding(.vertical, HabitTheme.Spacing.md)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Color legend from less to more completion")
     }
-    
-    private func dateKey(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
-    
+
+    // MARK: - Day Change Timer
+
     private func startDayChangeTimer() {
-        // Stop any existing timer
         stopDayChangeTimer()
-        
-        // Calculate time until next midnight
         let calendar = Calendar.current
         let now = Date()
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)!
         let nextMidnight = calendar.startOfDay(for: tomorrow)
         let timeUntilMidnight = nextMidnight.timeIntervalSince(now)
-        
-        // Set timer to fire at midnight
+
         dayChangeTimer = Timer.scheduledTimer(withTimeInterval: timeUntilMidnight, repeats: false) { _ in
-            // Day has changed, update the current date
             currentDate = Date()
-            
-            // Restart the timer for the next day
             startDayChangeTimer()
         }
-        
-        // Also set up a timer that checks every minute to catch any edge cases
+
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
             let now = Date()
-            let calendar = Calendar.current
-            
-            // Check if the day has changed
             if !calendar.isDate(currentDate, inSameDayAs: now) {
                 currentDate = now
             }
         }
     }
-    
+
     private func stopDayChangeTimer() {
         dayChangeTimer?.invalidate()
         dayChangeTimer = nil
     }
 }
+
+// MARK: - Contribution Cell
 
 struct ContributionCell: View {
     let date: Date
@@ -350,278 +262,269 @@ struct ContributionCell: View {
     let totalHabits: Int
     let isToday: Bool
     let onTap: () -> Void
-    
-    private let calendar = Calendar.current
-    
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         Button(action: onTap) {
-            RoundedRectangle(cornerRadius: 3)
+            RoundedRectangle(cornerRadius: 4)
                 .fill(cellColor)
-                .frame(width: 20, height: 20)
+                .frame(width: HabitTheme.Layout.contributionCellSize, height: HabitTheme.Layout.contributionCellSize)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(isToday ? Color.blue : Color.clear, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(isToday ? HabitTheme.Colors.brand : Color.clear, lineWidth: 2)
                 )
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityDescription)
+        .accessibilityHint("Double tap to view details")
     }
-    
+
     private var cellColor: Color {
-        if totalHabits == 0 {
-            return Color.gray.opacity(0.1)
-        }
-        
-        // Calculate completion level based on percentage
-        let completionPercentage = Double(completionCount) / Double(totalHabits)
-        let level: Int
-        
-        if completionPercentage == 0 {
-            level = 0
-        } else if completionPercentage <= 0.2 {
-            level = 1 // 1 habit or 20%
-        } else if completionPercentage <= 0.4 {
-            level = 2 // 2 habits or 40%
-        } else if completionPercentage <= 0.6 {
-            level = 3 // 3 habits or 60%
-        } else if completionPercentage <= 0.8 {
-            level = 4 // 4 habits or 80%
-        } else {
-            level = 5 // 5+ habits or 100%
-        }
-        
-        // GitHub-style color progression
-        switch level {
-        case 0:
-            return Color.gray.opacity(0.1) // No habits completed
-        case 1:
-            return Color(red: 0.9, green: 0.95, blue: 0.9) // Very light green
-        case 2:
-            return Color(red: 0.6, green: 0.9, blue: 0.6) // Light green
-        case 3:
-            return Color(red: 0.3, green: 0.8, blue: 0.3) // Medium green
-        case 4:
-            return Color(red: 0.1, green: 0.7, blue: 0.1) // Dark green
-        default:
-            return Color(red: 0.0, green: 0.6, blue: 0.0) // Super dark green
-        }
+        let level = HabitTheme.Colors.contributionLevel(completed: completionCount, total: totalHabits)
+        return HabitTheme.Colors.contributionColor(level: level, scheme: colorScheme)
+    }
+
+    private var accessibilityDescription: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        let dateStr = formatter.string(from: date)
+        if totalHabits == 0 { return "\(dateStr), no habits tracked" }
+        let pct = Int(Double(completionCount) / Double(totalHabits) * 100)
+        return "\(dateStr), \(completionCount) of \(totalHabits) completed, \(pct) percent"
     }
 }
+
+// MARK: - Year Selector View
 
 struct YearSelectorView: View {
     @Binding var selectedYear: Int
     @Binding var isPresented: Bool
-    
+
     private let currentYear = Calendar.current.component(.year, from: Date())
     private let startYear = 2024
-    
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                Text("Select Year")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                    .padding(.top)
-                
-                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 4), spacing: 16) {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 3), spacing: HabitTheme.Spacing.md) {
                     ForEach(availableYears(), id: \.self) { year in
-                        Button(action: {
+                        Button {
                             selectedYear = year
+                            HabitTheme.Haptics.selection()
                             isPresented = false
-                        }) {
-                            VStack(spacing: 4) {
+                        } label: {
+                            VStack(spacing: HabitTheme.Spacing.xs) {
                                 Text(String(year))
-                                    .font(.system(size: 28, weight: .bold))
+                                    .font(.system(size: 24, weight: .bold, design: .rounded))
                                     .foregroundColor(selectedYear == year ? .white : .primary)
-                                    .kerning(0)
 
                                 if year == currentYear {
                                     Text("Current")
-                                        .font(.caption)
-                                        .foregroundColor(selectedYear == year ? .white : .secondary)
+                                        .font(HabitTheme.Typography.caption)
+                                        .foregroundColor(selectedYear == year ? .white.opacity(0.8) : .secondary)
                                 }
                             }
-                            .frame(maxWidth: .infinity, minHeight: 60)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 4)
-                            .background(selectedYear == year ? Color.blue : Color(.systemGray6))
-                            .cornerRadius(12)
+                            .frame(maxWidth: .infinity, minHeight: 72)
+                            .background(
+                                RoundedRectangle(cornerRadius: HabitTheme.Layout.cornerRadiusSmall)
+                                    .fill(selectedYear == year ? HabitTheme.Colors.brand : HabitTheme.Colors.cardBackground)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: HabitTheme.Layout.cornerRadiusSmall)
+                                    .stroke(Color(.separator).opacity(0.2), lineWidth: selectedYear == year ? 0 : 0.5)
+                            )
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(year)\(year == currentYear ? ", current year" : "")\(year == selectedYear ? ", selected" : "")")
                     }
                 }
-                .padding(.horizontal)
-                
-                Spacer()
+                .padding(HabitTheme.Spacing.lg)
             }
-            .navigationTitle("Year Selection")
+            .background(HabitTheme.Colors.surface.ignoresSafeArea())
+            .navigationTitle("Select Year")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        isPresented = false
-                    }
+                    Button("Done") { isPresented = false }
+                        .font(HabitTheme.Typography.bodyMedium)
                 }
             }
         }
     }
-    
+
     private func availableYears() -> [Int] {
-        var years: [Int] = []
-        for year in startYear...currentYear + 2 { // Show current year + 2 future years
-            years.append(year)
-        }
-        return years
+        Array(startYear...currentYear + 2)
     }
 }
 
+// MARK: - Date Detail View
+
 struct DateDetailView: View {
     let date: Date
-    @ObservedObject var viewModel: HabitViewModel
+    @EnvironmentObject var viewModel: HabitViewModel
     @Environment(\.dismiss) private var dismiss
-    @State private var isDataLoaded = false
+    @Environment(\.colorScheme) private var colorScheme
 
-    private let dateFormatter = DateFormatter()
+    private let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d, yyyy"
+        return f
+    }()
 
-    init(date: Date, viewModel: HabitViewModel) {
-        self.date = date
-        self.viewModel = viewModel
-        dateFormatter.dateFormat = "EEEE, MMM d, yyyy"
-    }
-    
     var body: some View {
-        NavigationView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(dateFormatter.string(from: date))
-                    .font(.title2)
-                    .fontWeight(.semibold)
-                
-                if !isDataLoaded {
-                    VStack {
-                        ProgressView()
-                            .scaleEffect(1.2)
-                        Text("Loading...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: HabitTheme.Spacing.xl) {
                     let progress = viewModel.getProgressForDate(date)
                     let allHabits = viewModel.getAllHabitsForDate(date)
-                
-                if progress.total > 0 {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Habit Progress")
-                                .font(.headline)
-                            
-                            Spacer()
-                            
-                            Text("\(Int((Double(progress.completed) / Double(progress.total)) * 100))%")
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.green)
+
+                    // Progress summary
+                    if progress.total > 0 {
+                        progressSection(progress: progress)
+                    }
+
+                    // Active habits
+                    if !allHabits.active.isEmpty {
+                        habitsSection(habits: allHabits.active, title: "Habits")
+                    }
+
+                    // Archived habits
+                    if !allHabits.archived.isEmpty {
+                        archivedSection(habits: allHabits.archived)
+                    }
+
+                    if allHabits.active.isEmpty && allHabits.archived.isEmpty {
+                        VStack(spacing: HabitTheme.Spacing.md) {
+                            Image(systemName: "calendar.badge.minus")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                            Text("No habits tracked on this date")
+                                .font(HabitTheme.Typography.subheadline)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        ProgressView(value: Double(progress.completed), total: Double(progress.total))
-                            .progressViewStyle(LinearProgressViewStyle(tint: .green))
-                            .frame(height: 10)
-                            .scaleEffect(x: 1, y: 1.5, anchor: .center)
-                        
-                        Text("\(progress.completed) of \(progress.total) habits completed")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, HabitTheme.Spacing.xxxl)
                     }
                 }
-                
-                if !allHabits.active.isEmpty || !allHabits.archived.isEmpty {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // Active Habits Section
-                        if !allHabits.active.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Habits")
-                                    .font(.headline)
-                                
-                                ForEach(allHabits.active) { habit in
-                                    Button(action: {
-                                        viewModel.toggleHabitCompletion(habit, for: date)
-                                    }) {
-                                        HStack {
-                                            Image(systemName: viewModel.isHabitCompletedOnDate(habit, date: date) ? "checkmark.circle.fill" : "circle")
-                                                .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .green : .gray)
-
-                                            Text(habit.name)
-                                                .foregroundColor(viewModel.isHabitCompletedOnDate(habit, date: date) ? .primary : .secondary)
-
-                                            Spacer()
-                                        }
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
-                            }
-                        }
-                        
-                        // Archived Habits Section
-                        if !allHabits.archived.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Archived Habits")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                
-                                ForEach(allHabits.archived) { habit in
-                                    HStack {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.green)
-                                        
-                                        Text(habit.name)
-                                            .foregroundColor(.secondary)
-                                            .strikethrough()
-                                        
-                                        Spacer()
-                                        
-                                        Text("Archived")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 2)
-                                            .background(Color.gray.opacity(0.2))
-                                            .cornerRadius(4)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Text("No habits added yet")
-                        .foregroundColor(.secondary)
-                        .italic()
-                }
-                }
-                
-                Spacer()
+                .padding(HabitTheme.Spacing.lg)
             }
-            .padding()
-            .navigationTitle("Day Details")
+            .background(HabitTheme.Colors.surface.ignoresSafeArea())
+            .navigationTitle(dateFormatter.string(from: date))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-            .onAppear {
-                // Ensure data is loaded when view appears
-                isDataLoaded = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isDataLoaded = true
+                    Button("Done") { dismiss() }
+                        .font(HabitTheme.Typography.bodyMedium)
                 }
             }
         }
     }
-    
-    private func dateKey(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+
+    // MARK: - Progress Section
+
+    private func progressSection(progress: (completed: Int, total: Int)) -> some View {
+        let pct = Double(progress.completed) / Double(progress.total)
+
+        return HStack(spacing: HabitTheme.Spacing.xl) {
+            ProgressRing(progress: pct, size: 72, lineWidth: 8)
+
+            VStack(alignment: .leading, spacing: HabitTheme.Spacing.xs) {
+                Text("\(progress.completed) of \(progress.total)")
+                    .font(HabitTheme.Typography.title3)
+                    .foregroundColor(.primary)
+
+                Text("habits completed")
+                    .font(HabitTheme.Typography.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(HabitTheme.Spacing.lg)
+        .cardStyle()
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(progress.completed) of \(progress.total) habits completed, \(Int(pct * 100)) percent")
+    }
+
+    // MARK: - Habits Section
+
+    private func habitsSection(habits: [Habit], title: String) -> some View {
+        VStack(alignment: .leading, spacing: HabitTheme.Spacing.md) {
+            Text(title)
+                .font(HabitTheme.Typography.headline)
+                .foregroundColor(.primary)
+
+            VStack(spacing: HabitTheme.Spacing.sm) {
+                ForEach(habits) { habit in
+                    let isCompleted = viewModel.isHabitCompletedOnDate(habit, date: date)
+
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                            viewModel.toggleHabitCompletion(habit, for: date)
+                        }
+                        HabitTheme.Haptics.toggle()
+                    } label: {
+                        HStack(spacing: HabitTheme.Spacing.md) {
+                            Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundColor(isCompleted ? HabitTheme.Colors.success : Color(.tertiaryLabel))
+                                .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+                                .contentTransition(.symbolEffect(.replace))
+
+                            Text(habit.name)
+                                .font(HabitTheme.Typography.bodyMedium)
+                                .foregroundColor(.primary)
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, HabitTheme.Spacing.lg)
+                        .padding(.vertical, HabitTheme.Spacing.xs)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(habit.name), \(isCompleted ? "completed" : "not completed")")
+                    .accessibilityHint("Double tap to toggle completion")
+                }
+            }
+            .cardStyle()
+        }
+    }
+
+    // MARK: - Archived Section
+
+    private func archivedSection(habits: [Habit]) -> some View {
+        VStack(alignment: .leading, spacing: HabitTheme.Spacing.md) {
+            Text("Archived")
+                .font(HabitTheme.Typography.headline)
+                .foregroundColor(.secondary)
+
+            VStack(spacing: HabitTheme.Spacing.sm) {
+                ForEach(habits) { habit in
+                    HStack(spacing: HabitTheme.Spacing.md) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(HabitTheme.Colors.success.opacity(0.6))
+                            .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+
+                        Text(habit.name)
+                            .font(HabitTheme.Typography.body)
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        Text("Archived")
+                            .font(HabitTheme.Typography.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, HabitTheme.Spacing.sm)
+                            .padding(.vertical, HabitTheme.Spacing.xs)
+                            .background(Color(.systemGray5))
+                            .cornerRadius(HabitTheme.Layout.cornerRadiusTiny)
+                    }
+                    .padding(.horizontal, HabitTheme.Spacing.lg)
+                    .padding(.vertical, HabitTheme.Spacing.xs)
+                    .accessibilityLabel("\(habit.name), archived, completed")
+                }
+            }
+            .cardStyle()
+        }
     }
 }
