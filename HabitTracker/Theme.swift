@@ -13,75 +13,80 @@ enum HabitTheme {
 
     enum Colors {
 
-        // Brand - Indigo
+        // Brand - Electric Violet
         static let brand = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.47, green: 0.42, blue: 1.0, alpha: 1.0)
-            : UIColor(red: 0.37, green: 0.32, blue: 0.91, alpha: 1.0)
+            ? UIColor(red: 0.58, green: 0.38, blue: 1.0, alpha: 1.0)   // #9460FF
+            : UIColor(red: 0.46, green: 0.18, blue: 1.0, alpha: 1.0)   // #762DFF
         })
 
         static let brandSoft = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.47, green: 0.42, blue: 1.0, alpha: 0.15)
-            : UIColor(red: 0.37, green: 0.32, blue: 0.91, alpha: 0.10)
+            ? UIColor(red: 0.58, green: 0.38, blue: 1.0, alpha: 0.18)
+            : UIColor(red: 0.46, green: 0.18, blue: 1.0, alpha: 0.10)
         })
 
-        // Streak - Warm Coral
+        // Streak - Electric Orange-Red
         static let streak = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-            ? UIColor(red: 1.0, green: 0.45, blue: 0.38, alpha: 1.0)
-            : UIColor(red: 0.96, green: 0.35, blue: 0.26, alpha: 1.0)
+            ? UIColor(red: 1.0, green: 0.35, blue: 0.20, alpha: 1.0)   // #FF5933
+            : UIColor(red: 1.0, green: 0.24, blue: 0.10, alpha: 1.0)   // #FF3D1A
         })
 
         static let streakSoft = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-            ? UIColor(red: 1.0, green: 0.45, blue: 0.38, alpha: 0.15)
-            : UIColor(red: 0.96, green: 0.35, blue: 0.26, alpha: 0.10)
+            ? UIColor(red: 1.0, green: 0.35, blue: 0.20, alpha: 0.15)
+            : UIColor(red: 1.0, green: 0.24, blue: 0.10, alpha: 0.10)
         })
 
-        // Success - Green
+        // Success - Vivid Emerald
         static let success = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.20, green: 0.78, blue: 0.45, alpha: 1.0)
-            : UIColor(red: 0.18, green: 0.72, blue: 0.40, alpha: 1.0)
+            ? UIColor(red: 0.00, green: 0.90, blue: 0.50, alpha: 1.0)  // #00E580
+            : UIColor(red: 0.00, green: 0.76, blue: 0.40, alpha: 1.0)  // #00C266
         })
 
         static let successSoft = Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.20, green: 0.78, blue: 0.45, alpha: 0.12)
-            : UIColor(red: 0.18, green: 0.72, blue: 0.40, alpha: 0.08)
+            ? UIColor(red: 0.00, green: 0.90, blue: 0.50, alpha: 0.14)
+            : UIColor(red: 0.00, green: 0.76, blue: 0.40, alpha: 0.09)
         })
 
         // Surfaces
         static let cardBackground = Color(uiColor: .secondarySystemGroupedBackground)
         static let surface = Color(uiColor: .systemGroupedBackground)
 
-        // Contribution Grid Scale (6 levels)
+        // Contribution Grid Scale (6 levels) - vivid green ramp
         static func contributionColor(level: Int, scheme: ColorScheme) -> Color {
             let isDark = scheme == .dark
             switch level {
             case 0:
-                return isDark ? Color(white: 0.15) : Color(uiColor: .systemGray5)
+                return isDark ? Color(white: 0.13) : Color(uiColor: .systemGray5)
             case 1:
+                // Pale lime
                 return isDark
-                ? Color(red: 0.15, green: 0.35, blue: 0.22)
-                : Color(red: 0.78, green: 0.94, blue: 0.82)
+                ? Color(red: 0.04, green: 0.40, blue: 0.22)
+                : Color(red: 0.72, green: 0.98, blue: 0.80)
             case 2:
+                // Bright mint
                 return isDark
-                ? Color(red: 0.14, green: 0.48, blue: 0.30)
-                : Color(red: 0.49, green: 0.83, blue: 0.63)
+                ? Color(red: 0.02, green: 0.58, blue: 0.32)
+                : Color(red: 0.35, green: 0.92, blue: 0.56)
             case 3:
+                // Vivid green
                 return isDark
-                ? Color(red: 0.13, green: 0.58, blue: 0.35)
-                : Color(red: 0.29, green: 0.72, blue: 0.48)
+                ? Color(red: 0.00, green: 0.72, blue: 0.40)
+                : Color(red: 0.10, green: 0.82, blue: 0.44)
             case 4:
+                // Electric emerald
                 return isDark
-                ? Color(red: 0.12, green: 0.68, blue: 0.38)
-                : Color(red: 0.18, green: 0.62, blue: 0.35)
+                ? Color(red: 0.00, green: 0.84, blue: 0.46)
+                : Color(red: 0.00, green: 0.73, blue: 0.38)
             default:
+                // Full-blast neon green
                 return isDark
-                ? Color(red: 0.10, green: 0.78, blue: 0.40)
-                : Color(red: 0.10, green: 0.49, blue: 0.24)
+                ? Color(red: 0.20, green: 1.00, blue: 0.56)
+                : Color(red: 0.00, green: 0.62, blue: 0.30)
             }
         }
 

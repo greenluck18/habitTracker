@@ -262,6 +262,33 @@ class HabitViewModel: ObservableObject {
         return streak
     }
     
+    /// Global consistency streak: consecutive days with ≥1 habit completed.
+    /// One missed day is forgiven per streak run.
+    func globalConsistencyStreak() -> Int {
+        let calendar = Calendar.current
+        var streak = 0
+        var missedDayUsed = false
+        var date = calendar.startOfDay(for: Date())
+        let activeIDs = Set(habits.map { $0.id })
+
+        for _ in 0..<365 {
+            let key = dateKey(date)
+            let count = habitHistory[key]?.filter { activeIDs.contains($0) }.count ?? 0
+
+            if count > 0 {
+                streak += 1
+            } else if !missedDayUsed {
+                missedDayUsed = true
+                // grace day: continue without incrementing
+            } else {
+                break
+            }
+            guard let prev = calendar.date(byAdding: .day, value: -1, to: date) else { break }
+            date = prev
+        }
+        return streak
+    }
+
     func getTotalCompletedDays() -> Int {
         return habitHistory.keys.count
     }

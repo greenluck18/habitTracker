@@ -3,12 +3,12 @@ import SwiftUI
 struct HabitListView: View {
     @EnvironmentObject var viewModel: HabitViewModel
     @State private var showingAddHabit = false
-    @State private var showingEditHabits = false
     @State private var showingDeveloperMode = false
     @State private var titleTapCount = 0
     @State private var tapResetTimer: Timer?
     @State private var currentDate = Date()
     @State private var dayChangeTimer: Timer?
+    @State private var selectedHabitForEdit: Habit? = nil
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -18,55 +18,56 @@ struct HabitListView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: HabitTheme.Spacing.xl) {
-                    if viewModel.habits.isEmpty {
-                        emptyState
-                    } else {
-                        progressHeader
-                        habitCards
-                    }
-                }
-                .padding(.horizontal, HabitTheme.Spacing.lg)
-                .padding(.vertical, HabitTheme.Spacing.lg)
-            }
-            .background(HabitTheme.Colors.surface.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Button(action: handleTitleTap) {
-                        Text("My Habits")
-                            .font(HabitTheme.Typography.headline)
-                            .foregroundColor(.primary)
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: HabitTheme.Spacing.sm) {
-                        if !viewModel.habits.isEmpty {
-                            Button { showingEditHabits = true } label: {
-                                Image(systemName: "pencil")
-                                    .font(.body)
-                            }
+            ZStack(alignment: .bottomTrailing) {
+                ScrollView {
+                    VStack(spacing: HabitTheme.Spacing.xl) {
+                        if viewModel.habits.isEmpty {
+                            emptyState
+                        } else {
+                            progressHeader
+                            habitCards
                         }
-                        Button { showingAddHabit = true } label: {
-                            Image(systemName: "plus")
-                                .font(.body.weight(.semibold))
+                    }
+                    .padding(.horizontal, HabitTheme.Spacing.lg)
+                    .padding(.vertical, HabitTheme.Spacing.lg)
+                    .padding(.bottom, 80) // Space for FAB
+                }
+                .background(HabitTheme.Colors.surface.ignoresSafeArea())
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Button(action: handleTitleTap) {
+                            Text("My Habits")
+                                .font(HabitTheme.Typography.headline)
+                                .foregroundColor(.primary)
                         }
                     }
                 }
-            }
-            .sheet(isPresented: $showingAddHabit) {
-                AddHabitView()
-            }
-            .sheet(isPresented: $showingEditHabits) {
-                EditHabitsView()
-            }
-            .alert("Developer Mode", isPresented: $showingDeveloperMode) {
-                Button("Add Mocks") { viewModel.addMocksForCurrentYear() }
-                Button("Delete Mocks", role: .destructive) { viewModel.deleteAllMocks() }
-                Button("Cancel", role: .cancel) { }
-            } message: {
-                Text("Do you want to add or delete mock data?")
+                .sheet(isPresented: $showingAddHabit) {
+                    AddHabitView()
+                }
+                .sheet(item: $selectedHabitForEdit) { habit in
+                    EditHabitView(habit: habit)
+                }
+                .alert("Developer Mode", isPresented: $showingDeveloperMode) {
+                    Button("Add Mocks") { viewModel.addMocksForCurrentYear() }
+                    Button("Delete Mocks", role: .destructive) { viewModel.deleteAllMocks() }
+                    Button("Cancel", role: .cancel) { }
+                } message: {
+                    Text("Do you want to add or delete mock data?")
+                }
+                
+                // MARK: - Floating Add Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        FloatingAddButton {
+                            showingAddHabit = true
+                        }
+                        .padding(HabitTheme.Spacing.xl)
+                    }
+                }
             }
         }
         .onAppear { startDayChangeTimer() }
@@ -220,9 +221,32 @@ struct HabitListView: View {
                     .cardStyle(isHighlighted: isCompleted)
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    habitContextMenu(habit)
+                }
                 .accessibilityLabel("\(habit.name), \(isCompleted ? "completed" : "not completed")\(streak > 0 ? ", \(streak) day streak" : "")")
-                .accessibilityHint(isCompleted ? "Double tap to mark as not completed" : "Double tap to mark as completed")
+                .accessibilityHint("Tap to toggle completion, long-press for options")
             }
+        }
+    }
+
+    // MARK: - Context Menu for Habit Card
+
+    @ViewBuilder
+    private func habitContextMenu(_ habit: Habit) -> some View {
+        Button(action: {
+            selectedHabitForEdit = habit
+        }) {
+            Label("Edit", systemImage: "pencil")
+        }
+
+        Button(role: .destructive, action: {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                viewModel.deleteHabit(habit)
+            }
+            HabitTheme.Haptics.selection()
+        }) {
+            Label("Delete", systemImage: "trash")
         }
     }
 
