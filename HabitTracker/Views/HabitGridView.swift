@@ -16,17 +16,26 @@ struct IdentifiableDate: Identifiable {
 struct HabitGridView: View {
     @EnvironmentObject var viewModel: HabitViewModel
     @Environment(\.colorScheme) private var colorScheme
-    @StateObject private var catVM = CatViewModel()
     @State private var selectedDate: IdentifiableDate?
     @State private var selectedYear = Calendar.current.component(.year, from: Date())
+    @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var showingYearSelector = false
-    @State private var viewMode: ViewMode = .cat
+    @State private var viewMode: ViewMode = .month
     @State private var currentDate = Date()
     @State private var dayChangeTimer: Timer?
 
     enum ViewMode: String, CaseIterable {
-        case cat = "Cat"
+        case month = "Month"
         case year = "Year"
+    }
+
+    private let calendar = Calendar.current
+
+    private var monthYearString: String {
+        let monthFormatter = DateFormatter()
+        monthFormatter.dateFormat = "MMMM yyyy"
+        let date = calendar.date(from: DateComponents(year: selectedYear, month: selectedMonth)) ?? Date()
+        return monthFormatter.string(from: date)
     }
 
     var body: some View {
@@ -34,32 +43,37 @@ struct HabitGridView: View {
             VStack(spacing: 0) {
                 // Controls section
                 VStack(spacing: HabitTheme.Spacing.md) {
-                    // View mode toggle (cat tab uses cat's name if set)
+                    // View mode toggle
                     Picker("View Mode", selection: $viewMode) {
                         ForEach(ViewMode.allCases, id: \.self) { mode in
-                            if mode == .cat {
-                                Text(catVM.profile.name.isEmpty ? "Cat" : catVM.profile.name).tag(mode)
-                            } else {
-                                Text(mode.rawValue).tag(mode)
-                            }
+                            Text(mode.rawValue).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
                     .padding(.horizontal, HabitTheme.Spacing.lg)
 
-                    // Date navigation (year only)
-                    if viewMode == .year {
+                    // Date navigation
+                    if viewMode == .month {
+                        monthNavigation
+                    } else {
                         yearNavigation
                     }
                 }
                 .padding(.vertical, HabitTheme.Spacing.md)
 
                 // Content
-                if viewMode == .cat {
-                    CatRoomView(catVM: catVM)
-                        .environmentObject(viewModel)
-                } else {
-                    ScrollView {
+                ScrollView {
+                    if viewMode == .month {
+                        MonthCalendarView(
+                            year: selectedYear,
+                            month: selectedMonth,
+                            onDateTap: { date in
+                                selectedDate = IdentifiableDate(date: date)
+                                HabitTheme.Haptics.selection()
+                            }
+                        )
+                        .padding(.horizontal, HabitTheme.Spacing.lg)
+                    } else {
                         YearContributionGrid(
                             year: selectedYear,
                             onDateTap: { date in
@@ -69,10 +83,10 @@ struct HabitGridView: View {
                         )
                         .padding(.horizontal, HabitTheme.Spacing.lg)
                     }
-
-                    // Legend (year view only)
-                    legend
                 }
+
+                // Legend
+                legend
             }
             .background(HabitTheme.Colors.surface.ignoresSafeArea())
             .navigationTitle("Progress")
@@ -83,19 +97,58 @@ struct HabitGridView: View {
             .sheet(isPresented: $showingYearSelector) {
                 YearSelectorView(selectedYear: $selectedYear, isPresented: $showingYearSelector)
             }
-            .onAppear {
-                startDayChangeTimer()
-                catVM.refresh(streak: viewModel.globalConsistencyStreak())
-                let p = viewModel.getTodayProgress()
-                catVM.checkAllHabitsComplete(completed: p.completed, total: p.total)
-            }
-            .onChange(of: viewModel.habitHistory) { _, _ in
-                catVM.refresh(streak: viewModel.globalConsistencyStreak())
-                let p = viewModel.getTodayProgress()
-                catVM.checkAllHabitsComplete(completed: p.completed, total: p.total)
-            }
+            .onAppear { startDayChangeTimer() }
             .onDisappear { stopDayChangeTimer() }
         }
+    }
+
+    // MARK: - Month Navigation
+
+    private var monthNavigation: some View {
+        HStack {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if selectedMonth > 1 {
+                        selectedMonth -= 1
+                    } else {
+                        selectedMonth = 12
+                        selectedYear -= 1
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(HabitTheme.Colors.brand)
+                    .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+            }
+            .accessibilityLabel("Previous month")
+
+            Spacer()
+
+            Text(monthYearString)
+                .font(HabitTheme.Typography.title)
+                .foregroundColor(.primary)
+
+            Spacer()
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if selectedMonth < 12 {
+                        selectedMonth += 1
+                    } else {
+                        selectedMonth = 1
+                        selectedYear += 1
+                    }
+                }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(HabitTheme.Colors.brand)
+                    .frame(width: HabitTheme.Layout.minTouchTarget, height: HabitTheme.Layout.minTouchTarget)
+            }
+            .accessibilityLabel("Next month")
+        }
+        .padding(.horizontal, HabitTheme.Spacing.lg)
     }
 
     // MARK: - Year Navigation
